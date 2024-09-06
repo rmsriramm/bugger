@@ -1272,7 +1272,7 @@ echo "Which scripts you want to execute:"
 echo "1. Sideload"
 echo "2. Rollback"
 echo "3. Install Applications"
-echo "4. To collect bug report,Screen recording,screenshot and logcat"
+echo "4. Bug filing required files"
 echo "5. Apex Multiuser_BA"
 echo "6. Apex Multiuser Go"
 
