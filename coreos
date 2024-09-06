@@ -1,0 +1,1312 @@
+#!/bin/bash
+
+# Function for the first script's functionality
+Apex_multiuser_BA() {
+    echo "Running Apex_multiuser_BA..."
+    RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+# Ensure the script is executed on a Userdebug build
+echo "Make sure you use a Userdebug build"
+
+echo "Devices available:"
+DEVICES=$(adb devices -l | grep -v "List of devices attached" | grep -v "^$")
+echo "$DEVICES"
+
+if [ -z "$DEVICES" ]; then
+    echo "Error: No devices connected."
+    exit 1
+fi
+
+# Prepare arrays to map serial numbers to device names
+DEVICE_LIST=()
+DEVICE_NAMES=()
+
+# Populate the arrays with serial numbers and device names
+while IFS= read -r line; do
+    SERIAL=$(echo "$line" | awk '{print $1}')
+    if [ -n "$SERIAL" ]; then
+        DEVICE_NAME=$(echo "$line" | sed -e "s/^[^ ]* \(.*\)$/\1/")
+        DEVICE_LIST+=("$SERIAL")
+        DEVICE_NAMES+=("$DEVICE_NAME")
+    fi
+done <<< "$DEVICES"
+
+# Display devices and prompt for selection
+if [ ${#DEVICE_LIST[@]} -gt 1 ]; then
+    echo "Multiple devices connected. Please select one:"
+    PS3="Enter the number of your choice: "
+    select DEVICE_SERIAL in "${DEVICE_LIST[@]}"; do
+        if [ -n "$DEVICE_SERIAL" ]; then
+            for i in "${!DEVICE_LIST[@]}"; do
+                if [ "${DEVICE_LIST[$i]}" = "$DEVICE_SERIAL" ]; then
+                    DEVICE_NAME="${DEVICE_NAMES[$i]}"
+                    break
+                fi
+            done
+            echo "Selected device: $DEVICE_NAME ($DEVICE_SERIAL)"
+            break
+        else
+            echo "Invalid selection. Please try again."
+        fi
+    done
+elif [ ${#DEVICE_LIST[@]} -eq 1 ]; then
+    # Single device case
+    DEVICE_SERIAL="${DEVICE_LIST[0]}"
+    DEVICE_NAME="${DEVICE_NAMES[0]}"
+    echo "Only one device connected: $DEVICE_NAME ($DEVICE_SERIAL)"
+else
+    echo "Error: No devices available for selection."
+    exit 1
+fi
+
+
+echo "Creating second user"
+adb -s "$DEVICE_SERIAL" shell pm create-user "User Name" > /dev/null 2>&1
+ 
+# Set the ADB target device
+adb -s "$DEVICE_SERIAL" root > /dev/null
+
+# Capture current directory
+
+
+# Extract user ID
+user_info=$(adb -s "$DEVICE_SERIAL" shell pm list users)
+user_id=$(echo "$user_info" | grep -oP 'UserInfo{\K\d+' | tail -n 1)
+if [[ -z "$user_id" ]]; then
+    echo -e "${RED}Failed to extract user ID.${NC}"
+    exit 1
+fi
+echo "Switching to second user" > /dev/null 2>&1
+adb -s "$DEVICE_SERIAL" shell am switch-user ${user_id} > /dev/null 2>&1
+sleep 10
+adb -s "$DEVICE_SERIAL" shell am start -a com.android.setupwizard.FOUR_CORNER_EXIT > /dev/null 2>&1
+sleep 10
+adb -s "$DEVICE_SERIAL" shell am switch-user 0 > /dev/null 2>&1
+
+# Create and push file to the device
+echo "Welcome mainline" > push.txt
+echo "Welcome mainline" > vks.txt
+adb -s "$DEVICE_SERIAL" push push.txt /data/misc_de/${user_id}/apexdata/com.android.resolv > /dev/null 2>&1
+adb -s "$DEVICE_SERIAL" push vks.txt /data/misc/apexdata/com.android.resolv > /dev/null 2>&1
+echo "Test file pushed to Resolv root folder on  both main and second user"
+
+# Verify if the file is pushed correctly in first user 
+
+
+    command_output=$(adb -s "$DEVICE_SERIAL" shell cat /data/misc/apexdata/com.android.resolv/vks.txt)
+    search_text="Welcome mainline"
+    if echo "$command_output" | grep -q "$search_text"; then
+        echo "Text file present in first user"
+    else
+        echo -e "${RED}Text file not present in first user.${NC}"
+        exit 1
+    fi
+
+
+# Verify if the file is pushed correctly in second user 
+
+
+    command_output=$(adb -s "$DEVICE_SERIAL" shell cat /data/misc_de/${user_id}/apexdata/com.android.resolv/push.txt)
+    search_text="Welcome mainline"
+    if echo "$command_output" | grep -q "$search_text"; then
+        echo "Text file present in second user"
+    else
+        echo -e "${RED}Text file not present in second user.${NC}"
+        exit 1
+    fi
+
+adb shell am start -n com.android.vending/com.google.android.finsky.systemupdateactivity.SystemUpdateActivity > /dev/null 2>&1
+
+# Prompt user to reboot the device
+echo -e "${GREEN}Please update the train in device and click reboot in the device.${NC}"
+read -p "After the device has rebooted, Tap 'y' and Enter to continue or Tap 'n' and Enter to exit: " response
+
+if [[ "$response" == "y" ]]; then
+    echo "Continuing script..."
+else
+    echo -e "${RED}Exiting script.${NC}"
+    exit 1
+fi
+# To check adb root   
+        if adb -s "$DEVICE_SERIAL" get-state | grep -q "device"; then
+    echo "Device is connected. Trying to execute adb root..."
+    while true; do
+        if adb -s "$DEVICE_SERIAL" root; then
+            echo "ADB root command was successful."
+            break
+        else
+            echo "Failed to execute adb root command. Retrying..."
+            sleep 2  # Wait for 2 seconds before retrying
+        fi
+    done
+else
+    echo "Device is not connected or not recognized."
+fi
+
+# Verify if the file remains unchanged after reboot in first user  
+
+
+    command_output1=$(adb -s "$DEVICE_SERIAL" shell cat /data/misc/apexdata/com.android.resolv/vks.txt)
+    search_text1="Welcome mainline"
+    if echo "$command_output1" | grep -q "$search_text1"; then
+    echo "Pushed file remains unchanged after update to the latest train in first user"
+else
+    echo -e "${RED}Pushed file changed after update to the latest train in first user.${NC}"
+    exit 1
+fi
+
+
+# Verify if the file remains unchanged after reboot in second user  
+
+
+    command_output1=$(adb -s "$DEVICE_SERIAL" shell cat /data/misc_de/${user_id}/apexdata/com.android.resolv/push.txt)
+    search_text1="Welcome mainline"
+    if echo "$command_output1" | grep -q "$search_text1"; then
+    echo "Pushed file remains unchanged after update to the latest train in second user"
+else
+    echo -e "${RED}Pushed file changed after update to the latest train in second user.${NC}"
+    exit 1
+fi
+
+# Modify the file on the first user
+echo "Edit the mainline file" > vks.txt
+adb -s "$DEVICE_SERIAL" push vks.txt /data/misc/apexdata/com.android.resolv > /dev/null 2>&1
+adb -s "$DEVICE_SERIAL" shell "ls /data/misc/apexdata/com.android.resolv" > /dev/null
+
+    command_output2=$(adb -s "$DEVICE_SERIAL" shell cat /data/misc/apexdata/com.android.resolv/vks.txt)
+    search_text2="Edit the mainline file"
+    if echo "$command_output2" | grep -q "$search_text2"; then
+    echo "Text file modified in first user"
+else
+    echo -e "${RED}Unable to modify test file in first user.${NC}"
+    exit 1
+fi
+
+# Modify the file on the second user
+echo "Edit the mainline file" > push.txt
+adb -s "$DEVICE_SERIAL" push push.txt /data/misc_de/${user_id}/apexdata/com.android.resolv > /dev/null 2>&1
+adb -s "$DEVICE_SERIAL" shell "ls /data/misc_de/${user_id}/apexdata/com.android.resolv" > /dev/null
+
+    command_output2=$(adb -s "$DEVICE_SERIAL" shell cat /data/misc_de/${user_id}/apexdata/com.android.resolv/push.txt)
+    search_text2="Edit the mainline file"
+    if echo "$command_output2" | grep -q "$search_text2"; then
+    echo "Text file modified in second user"
+else
+    echo -e "${RED}Unable to modify test file in second user.${NC}"
+    exit 1
+fi
+adb -s "$DEVICE_SERIAL" shell am switch-user ${user_id} > /dev/null 2>&1
+sleep 10
+# Rollback 
+
+MAX_TRIES=3
+for (( i = 1; i <= MAX_TRIES; i++ )); do
+    echo "Rollback Try number $i" > /dev/null 2>&1
+    echo -e "${GREEN}Rolling back Primary train.${NC}"
+    rollback=$(adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.modulemetadata)
+  
+    if echo "$rollback" | grep -q "Reboot"; then
+        echo "Primary train rollbacked and rebooting the device, script will continue after device reboot"
+        adb -s "$DEVICE_SERIAL" reboot
+        echo -e "${GREEN}Device is rebooting. Waiting for it to come back online...${NC}"
+
+        # Wait for device to come back online
+        while ! adb -s "$DEVICE_SERIAL" wait-for-device; do
+            sleep 5
+        done
+
+        echo -e "${GREEN}Device is back online.${NC}"
+        sleep 10
+        
+      # To check adb root   
+        if adb -s "$DEVICE_SERIAL" get-state | grep -q "device"; then
+    echo "Device is connected. Trying to execute adb root..."
+    while true; do
+        if adb -s "$DEVICE_SERIAL" root; then
+            echo "ADB root command was successful."
+            break
+        else
+            echo "Failed to execute adb root command. Retrying..."
+            sleep 2  # Wait for 2 seconds before retrying
+        fi
+    done
+else
+    echo "Device is not connected or not recognized."
+fi
+        
+        sleep 10
+
+
+        command_output1=$(adb -s "$DEVICE_SERIAL" shell cat /data/misc/apexdata/com.android.resolv/vks.txt)
+        search_text1="Welcome mainline"
+        if echo "$command_output1" | grep -q "$search_text1"; then
+            echo -e "${GREEN}Test passed in first user.${NC}"
+        else
+            echo -e "${RED}Test failed in first user.${NC}"
+            exit 1
+        fi
+
+        # Verify if the file is restored to its original state in second user 
+        
+
+        command_output2=$(adb -s "$DEVICE_SERIAL" shell cat /data/misc_de/${user_id}/apexdata/com.android.resolv/push.txt)
+        search_text2="Welcome mainline"
+        if echo "$command_output2" | grep -q "$search_text2"; then
+            echo -e "${GREEN}Test passed in second user.${NC}"
+        else
+            echo -e "${RED}Test failed in second user.${NC}"
+            exit 1
+        fi
+        break
+    elif echo "$rollback" | grep -q "available"; then
+        echo -e "${RED}Rollback unavailable; please factory reset and set up the device again.${NC}"
+        exit 1
+    else
+        sleep 10
+        echo "Unable to do rollback action, trying $((MAX_TRIES - i)) more times to rollback"
+    fi
+done
+
+}
+
+# Function for the second script's functionality
+Apex_multiuser_Go() {
+    echo "Running Apex_multiuser_Go..."
+    #!/bin/bash
+
+# Define colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+# Ensure the script is executed on a Userdebug build
+echo "Make sure you use a Userdebug build and only for Go Devices "
+
+echo "Devices available:"
+DEVICES=$(adb devices -l | grep -v "List of devices attached" | grep -v "^$")
+echo "$DEVICES"
+
+if [ -z "$DEVICES" ]; then
+    echo "Error: No devices connected."
+    exit 1
+fi
+
+# Prepare arrays to map serial numbers to device names
+DEVICE_LIST=()
+DEVICE_NAMES=()
+
+# Populate the arrays with serial numbers and device names
+while IFS= read -r line; do
+    SERIAL=$(echo "$line" | awk '{print $1}')
+    if [ -n "$SERIAL" ]; then
+        DEVICE_NAME=$(echo "$line" | sed -e "s/^[^ ]* \(.*\)$/\1/")
+        DEVICE_LIST+=("$SERIAL")
+        DEVICE_NAMES+=("$DEVICE_NAME")
+    fi
+done <<< "$DEVICES"
+
+# Display devices and prompt for selection
+if [ ${#DEVICE_LIST[@]} -gt 1 ]; then
+    echo "Multiple devices connected. Please select one:"
+    PS3="Enter the number of your choice: "
+    select DEVICE_SERIAL in "${DEVICE_LIST[@]}"; do
+        if [ -n "$DEVICE_SERIAL" ]; then
+            for i in "${!DEVICE_LIST[@]}"; do
+                if [ "${DEVICE_LIST[$i]}" = "$DEVICE_SERIAL" ]; then
+                    DEVICE_NAME="${DEVICE_NAMES[$i]}"
+                    break
+                fi
+            done
+            echo "Selected device: $DEVICE_NAME ($DEVICE_SERIAL)"
+            break
+        else
+            echo "Invalid selection. Please try again."
+        fi
+    done
+elif [ ${#DEVICE_LIST[@]} -eq 1 ]; then
+    # Single device case
+    DEVICE_SERIAL="${DEVICE_LIST[0]}"
+    DEVICE_NAME="${DEVICE_NAMES[0]}"
+    echo "Only one device connected: $DEVICE_NAME ($DEVICE_SERIAL)"
+else
+    echo "Error: No devices available for selection."
+    exit 1
+fi
+
+
+echo "Creating second user"
+adb -s "$DEVICE_SERIAL" shell pm create-user "User Name" > /dev/null 2>&1
+ 
+# Set the ADB target device
+adb -s "$DEVICE_SERIAL" root > /dev/null
+
+# Capture current directory
+
+
+# Extract user ID
+user_info=$(adb -s "$DEVICE_SERIAL" shell pm list users)
+user_id=$(echo "$user_info" | grep -oP 'UserInfo{\K\d+' | tail -n 1)
+if [[ -z "$user_id" ]]; then
+    echo -e "${RED}Failed to extract user ID.${NC}"
+    exit 1
+fi
+echo "Switching to second user" > /dev/null 2>&1
+adb -s "$DEVICE_SERIAL" shell am switch-user ${user_id} > /dev/null 2>&1
+sleep 10
+adb -s "$DEVICE_SERIAL" shell am start -a com.android.setupwizard.FOUR_CORNER_EXIT > /dev/null 2>&1
+sleep 10
+adb -s "$DEVICE_SERIAL" shell am switch-user 0 > /dev/null 2>&1
+
+# Create and push file to the device
+echo "Welcome mainline" > push.txt
+echo "Welcome mainline" > vks.txt
+adb -s "$DEVICE_SERIAL" push push.txt /data/misc_de/${user_id}/apexdata/com.android.permission > /dev/null 2>&1
+adb -s "$DEVICE_SERIAL" push vks.txt /data/misc/apexdata/com.android.permission > /dev/null 2>&1
+echo "Test file pushed to permission root folder on  both main and second user"
+
+# Verify if the file is pushed correctly in first user 
+
+
+    command_output=$(adb -s "$DEVICE_SERIAL" shell cat /data/misc/apexdata/com.android.permission/vks.txt)
+    search_text="Welcome mainline"
+    if echo "$command_output" | grep -q "$search_text"; then
+        echo "Text file present in first user"
+    else
+        echo -e "${RED}Text file not present in first user.${NC}"
+        exit 1
+    fi
+
+
+# Verify if the file is pushed correctly in second user 
+
+
+    command_output=$(adb -s "$DEVICE_SERIAL" shell cat /data/misc_de/${user_id}/apexdata/com.android.permission/push.txt)
+    search_text="Welcome mainline"
+    if echo "$command_output" | grep -q "$search_text"; then
+        echo "Text file present in second user"
+    else
+        echo -e "${RED}Text file not present in second user.${NC}"
+        exit 1
+    fi
+
+adb shell am start -n com.android.vending/com.google.android.finsky.systemupdateactivity.SystemUpdateActivity > /dev/null 2>&1
+
+# Prompt user to reboot the device
+echo -e "${GREEN}Please update the train in device and click reboot in the device.${NC}"
+read -p "After the device has rebooted, Tap 'y' and Enter to continue or Tap 'n' and Enter to exit: " response
+
+if [[ "$response" == "y" ]]; then
+    echo "Continuing script..."
+else
+    echo -e "${RED}Exiting script.${NC}"
+    exit 1
+fi
+# To check adb root   
+        if adb -s "$DEVICE_SERIAL" get-state | grep -q "device"; then
+    echo "Device is connected. Trying to execute adb root..."
+    while true; do
+        if adb -s "$DEVICE_SERIAL" root; then
+            echo "ADB root command was successful."
+            break
+        else
+            echo "Failed to execute adb root command. Retrying..."
+            sleep 2  # Wait for 2 seconds before retrying
+        fi
+    done
+else
+    echo "Device is not connected or not recognized."
+fi
+
+# Verify if the file remains unchanged after reboot in first user  
+
+
+    command_output1=$(adb -s "$DEVICE_SERIAL" shell cat /data/misc/apexdata/com.android.permission/vks.txt)
+    search_text1="Welcome mainline"
+    if echo "$command_output1" | grep -q "$search_text1"; then
+    echo "Pushed file remains unchanged after update to the latest train in first user"
+else
+    echo -e "${RED}Pushed file changed after update to the latest train in first user.${NC}"
+    exit 1
+fi
+
+
+# Verify if the file remains unchanged after reboot in second user  
+
+
+    command_output1=$(adb -s "$DEVICE_SERIAL" shell cat /data/misc_de/${user_id}/apexdata/com.android.permission/push.txt)
+    search_text1="Welcome mainline"
+    if echo "$command_output1" | grep -q "$search_text1"; then
+    echo "Pushed file remains unchanged after update to the latest train in second user"
+else
+    echo -e "${RED}Pushed file changed after update to the latest train in second user.${NC}"
+    exit 1
+fi
+
+# Modify the file on the first user
+echo "Edit the mainline file" > vks.txt
+adb -s "$DEVICE_SERIAL" push vks.txt /data/misc/apexdata/com.android.permission > /dev/null 2>&1
+adb -s "$DEVICE_SERIAL" shell "ls /data/misc/apexdata/com.android.permission" > /dev/null
+
+    command_output2=$(adb -s "$DEVICE_SERIAL" shell cat /data/misc/apexdata/com.android.permission/vks.txt)
+    search_text2="Edit the mainline file"
+    if echo "$command_output2" | grep -q "$search_text2"; then
+    echo "Text file modified in first user"
+else
+    echo -e "${RED}Unable to modify test file in first user.${NC}"
+    exit 1
+fi
+
+# Modify the file on the second user
+echo "Edit the mainline file" > push.txt
+adb -s "$DEVICE_SERIAL" push push.txt /data/misc_de/${user_id}/apexdata/com.android.permission > /dev/null 2>&1
+adb -s "$DEVICE_SERIAL" shell "ls /data/misc_de/${user_id}/apexdata/com.android.permission" > /dev/null
+
+    command_output2=$(adb -s "$DEVICE_SERIAL" shell cat /data/misc_de/${user_id}/apexdata/com.android.permission/push.txt)
+    search_text2="Edit the mainline file"
+    if echo "$command_output2" | grep -q "$search_text2"; then
+    echo "Text file modified in second user"
+else
+    echo -e "${RED}Unable to modify test file in second user.${NC}"
+    exit 1
+fi
+adb -s "$DEVICE_SERIAL" shell am switch-user ${user_id} > /dev/null 2>&1
+sleep 10
+# Rollback 
+
+MAX_TRIES=3
+for (( i = 1; i <= MAX_TRIES; i++ )); do
+    echo "Rollback Try number $i" > /dev/null 2>&1
+    echo -e "${GREEN}Rolling back Primary train.${NC}"
+    rollback=$(adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.mainline.go.primary
+)
+  
+    if echo "$rollback" | grep -q "Reboot"; then
+        echo "Primary train rollbacked and rebooting the device, script will continue after device reboot"
+        adb -s "$DEVICE_SERIAL" reboot
+        echo -e "${GREEN}Device is rebooting. Waiting for it to come back online...${NC}"
+
+        # Wait for device to come back online
+        while ! adb -s "$DEVICE_SERIAL" wait-for-device; do
+            sleep 5
+        done
+
+        echo -e "${GREEN}Device is back online.${NC}"
+        sleep 10
+        
+      # To check adb root   
+        if adb -s "$DEVICE_SERIAL" get-state | grep -q "device"; then
+    echo "Device is connected. Trying to execute adb root..."
+    while true; do
+        if adb -s "$DEVICE_SERIAL" root; then
+            echo "ADB root command was successful."
+            break
+        else
+            echo "Failed to execute adb root command. Retrying..."
+            sleep 2  # Wait for 2 seconds before retrying
+        fi
+    done
+else
+    echo "Device is not connected or not recognized."
+fi
+        
+        sleep 10
+
+
+        command_output1=$(adb -s "$DEVICE_SERIAL" shell cat /data/misc/apexdata/com.android.permission/vks.txt)
+        search_text1="Welcome mainline"
+        if echo "$command_output1" | grep -q "$search_text1"; then
+            echo -e "${GREEN}Test passed in first user.${NC}"
+        else
+            echo -e "${RED}Test failed in first user.${NC}"
+            exit 1
+        fi
+
+        # Verify if the file is restored to its original state in second user 
+        
+
+        command_output2=$(adb -s "$DEVICE_SERIAL" shell cat /data/misc_de/${user_id}/apexdata/com.android.permission/push.txt)
+        search_text2="Welcome mainline"
+        if echo "$command_output2" | grep -q "$search_text2"; then
+            echo -e "${GREEN}Test passed in second user.${NC}"
+        else
+            echo -e "${RED}Test failed in second user.${NC}"
+            exit 1
+        fi
+        break
+    elif echo "$rollback" | grep -q "available"; then
+        echo -e "${RED}Rollback unavailable; please factory reset and set up the device again.${NC}"
+        exit 1
+    else
+        sleep 10
+        echo "Unable to do rollback action, trying $((MAX_TRIES - i)) more times to rollback"
+    fi
+done
+
+}
+
+# Function for the third script's functionality
+To_Collect_Bug_Filing_required_files() {
+    #!/bin/bash
+
+# Define colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+# Device selection logic
+echo "Devices available:"
+DEVICES=$(adb devices -l | grep -v "List of devices attached" | grep -v "^$")
+echo "$DEVICES"
+
+if [ -z "$DEVICES" ]; then
+    echo "Error: No devices connected."
+    exit 1
+fi
+
+# Prepare arrays to map serial numbers to device names
+DEVICE_LIST=()
+DEVICE_NAMES=()
+
+# Populate the arrays with serial numbers and device names
+while IFS= read -r line; do
+    SERIAL=$(echo "$line" | awk '{print $1}')
+    if [ -n "$SERIAL" ]; then
+        DEVICE_NAME=$(echo "$line" | sed -e "s/^[^ ]* \(.*\)$/\1/")
+        DEVICE_LIST+=("$SERIAL")
+        DEVICE_NAMES+=("$DEVICE_NAME")
+    fi
+done <<< "$DEVICES"
+
+# Display devices and prompt for selection
+if [ ${#DEVICE_LIST[@]} -gt 1 ]; then
+    echo "Multiple devices connected. Please select one:"
+    PS3="Enter the number of your choice: "
+    select DEVICE_SERIAL in "${DEVICE_LIST[@]}"; do
+        if [ -n "$DEVICE_SERIAL" ]; then
+            for i in "${!DEVICE_LIST[@]}"; do
+                if [ "${DEVICE_LIST[$i]}" = "$DEVICE_SERIAL" ]; then
+                    DEVICE_NAME="${DEVICE_NAMES[$i]}"
+                    break
+                fi
+            done
+            echo "Selected device: $DEVICE_NAME ($DEVICE_SERIAL)"
+            break
+        else
+            echo "Invalid selection. Please try again."
+        fi
+    done
+elif [ ${#DEVICE_LIST[@]} -eq 1 ]; then
+    # Single device case
+    DEVICE_SERIAL="${DEVICE_LIST[0]}"
+    DEVICE_NAME="${DEVICE_NAMES[0]}"
+    echo "Only one device connected: $DEVICE_NAME ($DEVICE_SERIAL)"
+else
+    echo "Error: No devices available for selection."
+    exit 1
+fi
+
+echo "Using device: $DEVICE_NAME ($DEVICE_SERIAL)"
+
+# Define filenames with timestamps
+timestamp=$(date +%Y%m%d_%H%M%S)
+video_filename="/data/local/tmp/video_$timestamp.mp4"
+log_filename="logcat_$timestamp.txt"
+screenshot_filename="screenshot_$timestamp.png"
+
+# Function to take a screenshot
+take_screenshot() {
+    timestamp=$(date +%Y%m%d_%H%M%S)
+    screenshot_filename="screenshot_$timestamp.png"
+    echo "Taking screenshot..."
+    adb -s "$DEVICE_SERIAL" shell screencap -p /data/local/tmp/$screenshot_filename
+    adb -s "$DEVICE_SERIAL" pull /data/local/tmp/$screenshot_filename . > /dev/null
+    echo "Screenshot saved as $screenshot_filename"
+}
+
+# Function to start screen recording
+start_screen_recording() {
+    echo "Starting screen recording..."
+    adb -s "$DEVICE_SERIAL" shell screenrecord $video_filename &
+    record_pid=$!
+    
+    read -p "Tap x to stop screen recording : " response
+
+if [[ "$response" == "x" ]]; then
+    echo "Stopping screen recording and saving the video in system"
+    adb -s "$DEVICE_SERIAL" shell pkill -SIGINT screenrecord
+    sleep 5
+    adb -s "$DEVICE_SERIAL" pull $video_filename . > /dev/null
+    echo "Recording saved as $video_filename"
+    exit 1
+   
+else
+    echo -e "${RED}Exiting script.${NC}"
+    exit 1
+    
+    fi
+    
+}
+startrecord(){
+#!/bin/bash
+
+echo "Do you want to start screen recording and logcat? (y/n): "
+read -p "" start_confirmation
+
+if [[ $start_confirmation == "y" ]]; then
+    echo "Starting screen recording..."
+    adb -s "$DEVICE_SERIAL" shell screenrecord $video_filename &
+    record_pid=$!
+else
+    echo "Exiting."
+    exit 0
+fi
+
+
+
+    }
+
+
+# Function to stop screen recording
+stop_screen_recording() {
+    echo "Stopping screen recording..."
+    adb -s "$DEVICE_SERIAL" shell pkill -SIGINT screenrecord
+    sleep 10
+    adb -s "$DEVICE_SERIAL" pull $video_filename . > /dev/null
+    echo "Recording saved as $video_filename"
+}
+
+# Function to start logcat
+start_logcat() {
+    echo "Starting logcat..."
+    adb -s "$DEVICE_SERIAL" logcat > $log_filename 2>&1 &
+    logcat_pid=$!
+    
+ read -p "Tap x to stop logcat : " response
+
+if [[ "$response" == "x" ]]; then
+echo "Stopping logcat..."
+    kill -9 $logcat_pid
+    echo "Logcat saved as $log_filename"
+    exit 1
+    
+    else
+    echo -e "${RED}Exiting script.${NC}"
+    exit 1
+    fi
+}
+
+logcat(){
+    echo "Starting logcat..."
+    adb -s "$DEVICE_SERIAL" logcat > $log_filename 2>&1 &
+    logcat_pid=$!
+    }
+
+
+# Function to stop logcat
+stop_logcat() {
+    echo "Stopping logcat..."
+    kill -9 $logcat_pid
+    echo "Logcat saved as $log_filename"
+}
+
+# Function to generate a bug report
+generate_bug_report() {
+    timestamp=$(date +%Y%m%d_%H%M%S)
+    echo "Generating bug report..."
+    adb -s "$DEVICE_SERIAL" bugreport > bugreport_$timestamp.txt
+    echo "Bug report saved as bugreport_$timestamp.txt"
+    exit 1
+}
+Crossreboot_logs(){
+echo "Started cross reboot logs"
+
+while true; do adb logcat | tee -a crosslogs.txt;
+echo "==========REBOOT============" >>   crosslogs.txt;
+done > /dev/null 2>&1
+
+}
+
+while true; do
+# Main menu for user selection
+    echo "Select the action to perform:"
+    echo "1) Screen Recording"
+    echo "2) Take Screenshot"
+    echo "3) Cross reboot logs"
+    echo "4) logcat"
+    echo "5) Bug Report"
+    echo "6) Show Device Info"
+    echo "7) Collect (Screen Recording,Screenshot, Logcat, Bug Report)Together"
+    echo "8) Exit"
+
+    read -p "Enter your choice (1-8): " choice
+    case $choice in
+        1)
+            start_screen_recording
+            ;;
+        3)
+            Crossreboot_logs
+            ;;
+        4)
+            start_logcat
+            ;;
+        2)
+            take_screenshot
+            ;;
+        5)
+            generate_bug_report
+            ;;
+        6)
+            Device_fingerprint=$(adb -s "$DEVICE_SERIAL" shell getprop | grep ro.build.fingerprint)
+            Android_Version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.build.version.release)
+            Playstore_version=$(adb -s "$DEVICE_SERIAL" shell dumpsys package com.android.vending | grep versionName | head -1 | cut -d'=' -f2)
+            hardware_version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.boot.hardware.revision)
+            Moduemetadata_version=$(adb -s "$DEVICE_SERIAL" shell dumpsys package com.google.android.modulemetadata | grep -E "versionCode" | awk -F 'versionCode=' '{print $2}' | awk -F ' ' '{print $1}' | sort -nr | head -n 1)
+            printf "\033[0;31mDevice Fingerprint:\033[0m %s\n" "$Device_fingerprint"
+            printf "\033[0;31mAndroid Version:\033[0m %s\n" "$Android_Version"
+            printf "\033[0;31mPlaystore Version:\033[0m %s\n" "$Playstore_version"
+            printf "\033[0;31mHardware Version:\033[0m %s\n" "$hardware_version"
+            printf "\033[0;31mModulemetadata version:\033[0m %s\n" "$Moduemetadata_version"
+            exit 1
+            ;;
+        7)
+            printf "Tap \033[0;31m's'\033[0m to take a screenshot.\n"
+printf "Tap \033[0;31m'x'\033[0m to stop Screen recording and Logcat.\n"
+
+
+startrecord
+logcat
+
+while true; do
+    read -r -n1 key  # Read a single character
+
+    if [[ $key == 's' ]]; then
+        take_screenshot
+    elif [[ $key == 'x' ]]; then
+        stop_screen_recording
+        stop_logcat
+        sleep 2
+        echo "Do you want to take bug report(y/n):"
+        read -p "" start_confirmation
+        
+        if [[ $start_confirmation == "y" ]]; then
+            trap 'exit' INT
+            generate_bug_report
+        else
+            exit 1
+        fi
+        break
+    fi
+done
+
+            ;;
+        8)
+            echo "Exiting."
+            # Make sure to stop any background processes
+            pkill -f screenrecord
+            pkill -f logcat
+            exit 0
+            ;;
+        *)
+            echo "Invalid selection. Please try again."
+            ;;
+    esac
+done
+
+
+}
+
+sideload() {
+#!/bin/bash
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+# Determine the current working directory
+CURRENT_DIR=$(pwd)
+
+# Set both SCRIPT_DIR and ZIP_DIR to the current working directory
+SCRIPT_DIR="$CURRENT_DIR"
+ZIP_DIR="$CURRENT_DIR"
+
+# Find the latest version of bundletool-all.jar relative to SCRIPT_DIR
+BUNDLETOOL_JAR=$(find "$SCRIPT_DIR" -name "bundletool-all-*.jar" | sort -V | tail -n 1)
+
+if [ -z "$BUNDLETOOL_JAR" ]; then
+    echo "Error: bundletool-all.jar not found in $SCRIPT_DIR"
+    exit 1
+fi
+
+# List connected devices with details
+echo "Devices available:"
+DEVICES=$(adb devices -l | grep -v "List of devices attached" | grep -v "^$")
+echo "$DEVICES"
+
+if [ -z "$DEVICES" ]; then
+    echo "Error: No devices connected."
+    exit 1
+fi
+
+# Prepare arrays to map serial numbers to device names
+DEVICE_LIST=()
+DEVICE_NAMES=()
+
+# Populate the arrays with serial numbers and device names
+while IFS= read -r line; do
+    SERIAL=$(echo "$line" | awk '{print $1}')
+    if [ -n "$SERIAL" ]; then
+        DEVICE_NAME=$(echo "$line" | sed -e "s/^[^ ]* \(.*\)$/\1/")
+        DEVICE_LIST+=("$SERIAL")
+        DEVICE_NAMES+=("$DEVICE_NAME")
+    fi
+done <<< "$DEVICES"
+
+# Display devices and prompt for selection
+if [ ${#DEVICE_LIST[@]} -gt 1 ]; then
+    echo "Multiple devices connected. Please select one:"
+    PS3="Enter the number of your choice: "
+    select DEVICE_SERIAL in "${DEVICE_LIST[@]}"; do
+        if [ -n "$DEVICE_SERIAL" ]; then
+            for i in "${!DEVICE_LIST[@]}"; do
+                if [ "${DEVICE_LIST[$i]}" = "$DEVICE_SERIAL" ]; then
+                    DEVICE_NAME="${DEVICE_NAMES[$i]}"
+                    break
+                fi
+            done
+            echo "Selected device: $DEVICE_NAME ($DEVICE_SERIAL)"
+            break
+        else
+            echo "Invalid selection. Please try again."
+        fi
+    done
+elif [ ${#DEVICE_LIST[@]} -eq 1 ]; then
+    # Single device case
+    DEVICE_SERIAL="${DEVICE_LIST[0]}"
+    DEVICE_NAME="${DEVICE_NAMES[0]}"
+    echo "Only one device connected: $DEVICE_NAME ($DEVICE_SERIAL)"
+else
+    echo "Error: No devices available for selection."
+    exit 1
+fi
+
+echo "Using device: $DEVICE_NAME ($DEVICE_SERIAL)"
+
+# Process each zip file in ZIP_DIR
+for zip_file in "$ZIP_DIR"/*.zip; do
+    if [ -f "$zip_file" ]; then
+        echo "Processing $zip_file on device $DEVICE_NAME ($DEVICE_SERIAL)"
+        # Ensure the device ID is passed to the command
+        java -jar "$BUNDLETOOL_JAR" install-multi-apks --device-id="$DEVICE_SERIAL" --enable-rollback --update-only --apks-zip="$zip_file"
+        echo -e "${GREEN}Done processing $zip_file${NC}"
+        echo "----------------------------------------"
+    fi
+done
+
+# Prompt user to restart the device
+read -p "Do you want to restart the device (y/n)? " restart_choice
+if [ "$restart_choice" == "y" ]; then
+    echo "Restarting device $DEVICE_NAME ($DEVICE_SERIAL)..."
+    adb -s "$DEVICE_SERIAL" reboot
+    echo -e "${RED}Device restarted.${NC}"
+else
+    echo -e "${RED}Thank you.${NC}"
+fi
+}
+Install_apks(){
+#!/bin/bash
+
+# ANSI color codes
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Directory where APK files are stored
+APK_DIR=$(pwd)
+
+# Function to install APK
+install_apk() {
+    local apk_path="$1"
+    local apk_name="$(basename "$apk_path")"
+    
+    echo "Installing $apk_name..."
+    
+    # Install APK
+    if adb -s "$DEVICE_SERIAL" install "$apk_path"; then
+        echo -e "${GREEN}Successfully installed $apk_name.${NC}" > /dev/null 2>&1
+    else
+        echo -e "${RED}Failed to install $apk_name.${NC}"
+    fi
+}
+
+# Function to install all APKs in the directory
+install_all_apks() {
+    echo "Installing all APKs in $APK_DIR..."
+    for apk_file in "$APK_DIR"/*.apk; do
+        install_apk "$apk_file"
+    done
+}
+
+# List connected devices with details
+echo "Devices available:"
+DEVICES=$(adb devices -l | grep -v "List of devices attached" | grep -v "^$")
+echo "$DEVICES"
+
+if [ -z "$DEVICES" ]; then
+    echo "Error: No devices connected."
+    exit 1
+fi
+
+# Prepare arrays to map serial numbers to device names
+DEVICE_LIST=()
+DEVICE_NAMES=()
+
+# Populate the arrays with serial numbers and device names
+while IFS= read -r line; do
+    SERIAL=$(echo "$line" | awk '{print $1}')
+    if [ -n "$SERIAL" ]; then
+        DEVICE_NAME=$(echo "$line" | sed -e "s/^[^ ]* \(.*\)$/\1/")
+        DEVICE_LIST+=("$SERIAL")
+        DEVICE_NAMES+=("$DEVICE_NAME")
+    fi
+done <<< "$DEVICES"
+
+# Display devices and prompt for selection
+if [ ${#DEVICE_LIST[@]} -gt 1 ]; then
+    echo "Multiple devices connected. Please select one:"
+    PS3="Enter the number of your choice: "
+    select DEVICE_SERIAL in "${DEVICE_LIST[@]}"; do
+        if [ -n "$DEVICE_SERIAL" ]; then
+            for i in "${!DEVICE_LIST[@]}"; do
+                if [ "${DEVICE_LIST[$i]}" = "$DEVICE_SERIAL" ]; then
+                    DEVICE_NAME="${DEVICE_NAMES[$i]}"
+                    break
+                fi
+            done
+            echo "Selected device: $DEVICE_NAME ($DEVICE_SERIAL)"
+            break
+        else
+            echo "Invalid selection. Please try again."
+        fi
+    done
+elif [ ${#DEVICE_LIST[@]} -eq 1 ]; then
+    # Single device case
+    DEVICE_SERIAL="${DEVICE_LIST[0]}"
+    DEVICE_NAME="${DEVICE_NAMES[0]}"
+    echo "Only one device connected: $DEVICE_NAME ($DEVICE_SERIAL)"
+else
+    echo "Error: No devices available for selection."
+    exit 1
+fi
+
+echo "Using device: $DEVICE_NAME ($DEVICE_SERIAL)"
+
+# List APK files in the directory
+APPS=()
+while IFS= read -r -d '' apk_file; do
+    apk_filename=$(basename "$apk_file")
+    APPS+=("$apk_filename")
+done < <(find "$APK_DIR" -name "*.apk" -type f -print0)
+
+# Display menu for APK selection
+if [ ${#APPS[@]} -eq 0 ]; then
+    echo -e "${RED}No APK files found in $APK_DIR.${NC}"
+    exit 1
+fi
+
+echo "Available Applications:"
+echo "1) Install all APKs"
+echo "2) Select specific applications to install"
+echo "Enter your choice (1 or 2):"
+
+read -rp "Choice: " choice
+
+case $choice in
+    1)
+        install_all_apks
+        ;;
+    2)
+        echo "Select the applications you want to install (enter numbers separated by spaces):"
+        for index in "${!APPS[@]}"; do
+            echo "$((index+1))) ${APPS[index]}"
+        done
+
+        selected_indices=()
+        while true; do
+            read -rp "Enter application numbers to install. For multiple applications, select each APK number with a space, then press Enter: " -a selected_indices
+            if [ "${#selected_indices[@]}" -eq 0 ]; then
+                echo "No selection made."
+            elif [[ "${selected_indices[*]}" =~ [^0-9\ ] ]]; then
+                echo "Invalid input. Please enter numbers separated by spaces."
+            else
+                break
+            fi
+        done
+
+        # Install selected APKs
+        for index in "${selected_indices[@]}"; do
+            if [ "$index" -gt 0 ] && [ "$index" -le "${#APPS[@]}" ]; then
+                apk_filename="${APPS[index-1]}"
+                apk_path="$APK_DIR/$apk_filename"
+                install_apk "$apk_path"
+            else
+                echo -e "${RED}Invalid selection: $index. Skipping...${NC}"
+            fi
+        done
+        ;;
+    *)
+        echo -e "${RED}Invalid choice.${NC}"
+        exit 1
+        ;;
+esac
+
+echo "Installation process completed."
+
+}
+Rollback() {
+#!/bin/bash
+
+# List connected devices with details
+echo "Devices available:"
+DEVICES=$(adb devices -l | grep -v "List of devices attached" | grep -v "^$")
+echo "$DEVICES"
+
+if [ -z "$DEVICES" ]; then
+    echo "Error: No devices connected."
+    exit 1
+fi
+
+# Prepare arrays to map serial numbers to device names
+DEVICE_LIST=()
+DEVICE_NAMES=()
+
+# Populate the arrays with serial numbers and device names
+while IFS= read -r line; do
+    SERIAL=$(echo "$line" | awk '{print $1}')
+    if [ -n "$SERIAL" ]; then
+        DEVICE_NAME=$(echo "$line" | sed -e "s/^[^ ]* \(.*\)$/\1/")
+        DEVICE_LIST+=("$SERIAL")
+        DEVICE_NAMES+=("$DEVICE_NAME")
+    fi
+done <<< "$DEVICES"
+
+# Display devices and prompt for selection
+if [ ${#DEVICE_LIST[@]} -gt 1 ]; then
+    echo "Multiple devices connected. Please select one:"
+    PS3="Enter the number of your choice: "
+    select DEVICE_SERIAL in "${DEVICE_LIST[@]}"; do
+        if [ -n "$DEVICE_SERIAL" ]; then
+            for i in "${!DEVICE_LIST[@]}"; do
+                if [ "${DEVICE_LIST[$i]}" = "$DEVICE_SERIAL" ]; then
+                    DEVICE_NAME="${DEVICE_NAMES[$i]}"
+                    break
+                fi
+            done
+            echo "Selected device: $DEVICE_NAME ($DEVICE_SERIAL)"
+            break
+        else
+            echo "Invalid selection. Please try again."
+        fi
+    done
+elif [ ${#DEVICE_LIST[@]} -eq 1 ]; then
+    # Single device case
+    DEVICE_SERIAL="${DEVICE_LIST[0]}"
+    DEVICE_NAME="${DEVICE_NAMES[0]}"
+    echo "Only one device connected: $DEVICE_NAME ($DEVICE_SERIAL)"
+else
+    echo "Error: No devices available for selection."
+    exit 1
+fi
+
+# Function to rollback individual Big_Android trains
+Big_Android() {
+    echo "Select the Big_Android module to rollback:"
+    echo "1) Primary Train"
+    echo "2) Telemetry Train"
+    echo "3) Adservices Train"
+    echo "4) Tzdata Train"
+    echo "5) Rollback All Big_Android Trains"
+    echo "6) Back to Main Menu"
+
+    read -p "Enter your choice (1-6): " module_choice
+
+    case $module_choice in
+        1)
+            echo "Rollbacking Primary Train"
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.modulemetadata
+            ;;
+        2)
+            echo "Rollbacking Telemetry Train"
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.mainline.telemetry
+            ;;
+        3)
+            echo "Rollbacking Adservices Train"
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.mainline.adservices
+            ;;
+        4)
+            echo "Rollbacking Tzdata Train"
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.tzdata2
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.tzdata3
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.tzdata4
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.tzdata5
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.tzdata6
+            ;;
+        5)
+            echo "Rollbacking Primary Train"
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.modulemetadata
+            echo "Rollbacking Telemetry Train"
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.mainline.telemetry
+            echo "Rollbacking Adservices Train"
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.mainline.adservices
+            echo "Rollbacking Tzdata Train"
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.tzdata2
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.tzdata3
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.tzdata4
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.tzdata5
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.tzdata6
+            ;;
+        6)
+            return
+            ;;
+        *)
+            echo "Invalid selection. Returning to main menu."
+            ;;
+    esac
+    PromptReboot
+}
+
+# Function to rollback individual Go_Android trains
+Go_Android() {
+    echo "Select the Go_Android module to rollback:"
+    echo "1) Go Primary Train"
+    echo "2) Go Non-updatable Train"
+    echo "3) Go Telemetry Train"
+    echo "4) Go Tzdata Train"
+    echo "5) Rollback All Go_Android Trains"
+    echo "6) Back to Main Menu"
+
+    read -p "Enter your choice (1-6): " module_choice
+
+    case $module_choice in
+        1)
+            echo "Rollbacking Go Primary Train"
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.mainline.go.primary
+            ;;
+        2)
+            echo "Rollbacking Go Non-updatable Train"
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.mainline.go.mediaprovider
+            ;;
+        3)
+            echo "Rollbacking Go Telemetry Train"
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.mainline.go.telemetry
+            ;;
+        4)
+            echo "Rollbacking Go Tzdata Train"
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.tzdata4
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.tzdata5
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.tzdata6
+            ;;
+        5)
+            echo "Rollbacking Go Primary Train"
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.mainline.go.primary
+            echo "Rollbacking Go Non-updatable Train"
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.mainline.go.mediaprovider
+            echo "Rollbacking Go Telemetry Train"
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.mainline.go.telemetry
+            echo "Rollbacking Go Tzdata Train"
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.tzdata4
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.tzdata5
+            adb -s "$DEVICE_SERIAL" shell pm rollback-app com.google.android.tzdata6
+            ;;
+        *)
+            echo "Invalid selection. Returning to main menu."
+            ;;
+    esac
+    PromptReboot
+}
+
+# Function to prompt user for device reboot
+PromptReboot() {
+    read -p "Do you want to restart the device? (y/n): " reboot_choice
+    if [ "$reboot_choice" = "y" ]; then
+        echo "Rebooting device..."
+        adb -s "$DEVICE_SERIAL" reboot
+        exit 1
+    else
+        echo "Skipping reboot."
+        exit 1
+    fi
+}
+
+# Display main menu and get user input
+while true; do
+    echo "Select the rollback option:"
+    echo "1) Rollback Big_Android"
+    echo "2) Rollback Go_Android"
+    echo "3) Exit"
+
+    read -p "Enter your choice (1-3): " choice
+
+    case $choice in
+        1)
+            Big_Android
+            ;;
+        2)
+            Go_Android
+            ;;
+        3)
+            echo "Exiting."
+            exit 0
+            ;;
+        *)
+            echo "Invalid choice. Exiting."
+            exit 1
+            ;;
+    esac
+done
+}
+
+# Display available options
+echo "Which scripts you want to execute:"
+echo "1. Sideload"
+echo "2. Rollback"
+echo "3. Install Applications"
+echo "4. To collect bug report,Screen recording,screenshot and logcat"
+echo "5. Apex Multiuser_BA"
+echo "6. Apex Multiuser Go"
+
+# Prompt the user for their choice
+read -p "Enter the number of the script to execute (1-6): " choice
+
+# Execute the corresponding function based on user input
+case $choice in
+    
+    5)
+        Apex_multiuser_BA
+        ;;
+    6)
+        Apex_multiuser_Go
+        ;;
+    4)
+        To_Collect_Bug_Filing_required_files
+        ;;
+        
+    1)
+        sideload
+        ;;
+    3)
+        Install_apks
+        ;;
+    2)
+    
+        Rollback
+        ;;
+    *)
+        echo "Invalid selection."
+        exit 1
+        ;;
+esac
+
+echo "Script executed successfully."
+
