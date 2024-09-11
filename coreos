@@ -771,6 +771,16 @@ while true; do
             exit 1
             ;;
         7)
+            Device_fingerprint=$(adb -s "$DEVICE_SERIAL" shell getprop | grep ro.build.fingerprint)
+            Android_Version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.build.version.release)
+            Playstore_version=$(adb -s "$DEVICE_SERIAL" shell dumpsys package com.android.vending | grep versionName | head -1 | cut -d'=' -f2)
+            hardware_version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.boot.hardware.revision)
+            Moduemetadata_version=$(adb -s "$DEVICE_SERIAL" shell dumpsys package com.google.android.modulemetadata | grep -E "versionCode" | awk -F 'versionCode=' '{print $2}' | awk -F ' ' '{print $1}' | sort -nr | head -n 1)
+            printf "\033[0;31mDevice Fingerprint:\033[0m %s\n" "$Device_fingerprint"
+            printf "\033[0;31mAndroid Version:\033[0m %s\n" "$Android_Version"
+            printf "\033[0;31mPlaystore Version:\033[0m %s\n" "$Playstore_version"
+            printf "\033[0;31mHardware Version:\033[0m %s\n" "$hardware_version"
+            printf "\033[0;31mModulemetadata version:\033[0m %s\n" "$Moduemetadata_version"
             printf "Tap \033[0;31m's'\033[0m to take a screenshot.\n"
 printf "Tap \033[0;31m'x'\033[0m to stop Screen recording and Logcat.\n"
 
@@ -784,6 +794,7 @@ while true; do
     if [[ $key == 's' ]]; then
         take_screenshot
     elif [[ $key == 'x' ]]; then
+sleep 2
         stop_screen_recording
         stop_logcat
         sleep 2
