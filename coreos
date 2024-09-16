@@ -548,7 +548,7 @@ done
 
 # Function for the third script's functionality
 To_Collect_Bug_Filing_required_files() {
-    #!/bin/bash
+  #!/bin/bash
 
 # Define colors for output
 RED='\033[0;31m'
@@ -627,31 +627,9 @@ take_screenshot() {
 
 # Function to start screen recording
 start_screen_recording() {
-    echo "Starting screen recording..."
-    adb -s "$DEVICE_SERIAL" shell screenrecord $video_filename &
-    record_pid=$!
-    
-    read -p "Tap x to stop screen recording : " response
+    #!/bin/bash
 
-if [[ "$response" == "x" ]]; then
-    echo "Stopping screen recording and saving the video in system"
-    adb -s "$DEVICE_SERIAL" shell pkill -SIGINT screenrecord
-    sleep 5
-    adb -s "$DEVICE_SERIAL" pull $video_filename . > /dev/null
-    echo "Recording saved as $video_filename"
-    exit 1
-   
-else
-    echo -e "${RED}Exiting script.${NC}"
-    exit 1
-    
-    fi
-    
-}
-startrecord(){
-#!/bin/bash
-
-echo "Do you want to start screen recording and logcat? (y/n): "
+echo "Do you want to start screen recording (y/n): "
 read -p "" start_confirmation
 
 if [[ $start_confirmation == "y" ]]; then
@@ -663,10 +641,7 @@ else
     exit 0
 fi
 
-
-
-    }
-
+}
 
 # Function to stop screen recording
 stop_screen_recording() {
@@ -682,27 +657,8 @@ start_logcat() {
     echo "Starting logcat..."
     adb -s "$DEVICE_SERIAL" logcat > $log_filename 2>&1 &
     logcat_pid=$!
-    
- read -p "Tap x to stop logcat : " response
 
-if [[ "$response" == "x" ]]; then
-echo "Stopping logcat..."
-    kill -9 $logcat_pid
-    echo "Logcat saved as $log_filename"
-    exit 1
-    
-    else
-    echo -e "${RED}Exiting script.${NC}"
-    exit 1
-    fi
 }
-
-logcat(){
-    echo "Starting logcat..."
-    adb -s "$DEVICE_SERIAL" logcat > $log_filename 2>&1 &
-    logcat_pid=$!
-    }
-
 
 # Function to stop logcat
 stop_logcat() {
@@ -719,74 +675,92 @@ generate_bug_report() {
     echo "Bug report saved as bugreport_$timestamp.txt"
     exit 1
 }
-Crossreboot_logs(){
-echo "Started cross reboot logs"
 
-while true; do adb logcat | tee -a crosslogs.txt;
-echo "==========REBOOT============" >>   crosslogs.txt;
-done > /dev/null 2>&1
-
+# Function to start cross reboot logs
+cross_reboot_logs() {
+    echo "Started cross reboot logs"
+    while true; do
+        adb logcat | tee -a crosslogs.txt
+        echo "==========REBOOT============" >> crosslogs.txt done > /dev/null 2>&1
+        echo "CTRL+C to stop the Cross reboot logs"
+    done
 }
 
-while true; do
+# Device_Info
+Device_info() {
+Device_fingerprint=$(adb -s "$DEVICE_SERIAL" shell getprop | grep ro.build.fingerprint)
+            Android_Version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.build.version.release)
+            Playstore_version=$(adb -s "$DEVICE_SERIAL" shell dumpsys package com.android.vending | grep versionName | head -1 | cut -d'=' -f2)
+            hardware_version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.boot.hardware.revision)
+            Moduemetadata_version=$(adb -s "$DEVICE_SERIAL" shell dumpsys package com.google.android.modulemetadata | grep -E "versionCode" | awk -F 'versionCode=' '{print $2}' | awk -F ' ' '{print $1}' | sort -nr | head -n 1)
+            printf "\033[0;31mDevice Fingerprint:\033[0m %s\n" "$Device_fingerprint"
+            printf "\033[0;31mAndroid Version:\033[0m %s\n" "$Android_Version"
+            printf "\033[0;31mPlaystore Version:\033[0m %s\n" "$Playstore_version"
+            printf "\033[0;31mHardware Version:\033[0m %s\n" "$hardware_version"
+            printf "\033[0;31mModulemetadata version:\033[0m %s\n" "$Moduemetadata_version"
+           
+}
+
 # Main menu for user selection
+while true; do
     echo "Select the action to perform:"
     echo "1) Screen Recording"
     echo "2) Take Screenshot"
     echo "3) Cross reboot logs"
-    echo "4) logcat"
+    echo "4) Logcat"
     echo "5) Bug Report"
     echo "6) Show Device Info"
-    echo "7) Collect (Screen Recording,Screenshot, Logcat, Bug Report)Together"
+    echo "7) Collect (Device Info, Screen Recording, Screenshot, Logcat, Bug Report) Together"
     echo "8) Exit"
 
     read -p "Enter your choice (1-8): " choice
     case $choice in
         1)
             start_screen_recording
-            ;;
-        3)
-            Crossreboot_logs
-            ;;
-        4)
-            start_logcat
+            printf "Tap \033[0;31m'x'\033[0m to stop Screen recording.\n"
+            read -r -n1 key
+            if [[ $key == "x" ]]; then
+                stop_screen_recording
+                exit 1
+            else
+                echo -e "${RED}Invalid input. Exiting.${NC}"
+                exit 1
+            fi
             ;;
         2)
             take_screenshot
             ;;
+        3)
+            cross_reboot_logs
+            ;;
+        4)
+            start_logcat
+            printf "Tap \033[0;31m'x'\033[0m to Stop Logcat.\n"
+            read -r -n1 key
+            if [[ $key == "x" ]]; then
+                stop_logcat
+                exit 1
+            else
+                echo -e "${RED}Invalid input. Exiting.${NC}"
+                exit 1
+            fi
+            ;;
         5)
             generate_bug_report
-            ;;
-        6)
-            Device_fingerprint=$(adb -s "$DEVICE_SERIAL" shell getprop | grep ro.build.fingerprint)
-            Android_Version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.build.version.release)
-            Playstore_version=$(adb -s "$DEVICE_SERIAL" shell dumpsys package com.android.vending | grep versionName | head -1 | cut -d'=' -f2)
-            hardware_version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.boot.hardware.revision)
-            Moduemetadata_version=$(adb -s "$DEVICE_SERIAL" shell dumpsys package com.google.android.modulemetadata | grep -E "versionCode" | awk -F 'versionCode=' '{print $2}' | awk -F ' ' '{print $1}' | sort -nr | head -n 1)
-            printf "\033[0;31mDevice Fingerprint:\033[0m %s\n" "$Device_fingerprint"
-            printf "\033[0;31mAndroid Version:\033[0m %s\n" "$Android_Version"
-            printf "\033[0;31mPlaystore Version:\033[0m %s\n" "$Playstore_version"
-            printf "\033[0;31mHardware Version:\033[0m %s\n" "$hardware_version"
-            printf "\033[0;31mModulemetadata version:\033[0m %s\n" "$Moduemetadata_version"
             exit 1
             ;;
-        7)
-            Device_fingerprint=$(adb -s "$DEVICE_SERIAL" shell getprop | grep ro.build.fingerprint)
-            Android_Version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.build.version.release)
-            Playstore_version=$(adb -s "$DEVICE_SERIAL" shell dumpsys package com.android.vending | grep versionName | head -1 | cut -d'=' -f2)
-            hardware_version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.boot.hardware.revision)
-            Moduemetadata_version=$(adb -s "$DEVICE_SERIAL" shell dumpsys package com.google.android.modulemetadata | grep -E "versionCode" | awk -F 'versionCode=' '{print $2}' | awk -F ' ' '{print $1}' | sort -nr | head -n 1)
-            printf "\033[0;31mDevice Fingerprint:\033[0m %s\n" "$Device_fingerprint"
-            printf "\033[0;31mAndroid Version:\033[0m %s\n" "$Android_Version"
-            printf "\033[0;31mPlaystore Version:\033[0m %s\n" "$Playstore_version"
-            printf "\033[0;31mHardware Version:\033[0m %s\n" "$hardware_version"
-            printf "\033[0;31mModulemetadata version:\033[0m %s\n" "$Moduemetadata_version"
-            printf "Tap \033[0;31m's'\033[0m to take a screenshot.\n"
+        6)
+            Device_info
+            exit 1
+            ;;
+          7)
+          
+
+Device_info
+start_screen_recording
+start_logcat
+ printf "Tap \033[0;31m's'\033[0m to take a screenshot.\n"
 printf "Tap \033[0;31m'x'\033[0m to stop Screen recording and Logcat.\n"
-
-
-startrecord
-logcat
 
 while true; do
     read -r -n1 key  # Read a single character
@@ -794,16 +768,16 @@ while true; do
     if [[ $key == 's' ]]; then
         take_screenshot
     elif [[ $key == 'x' ]]; then
-sleep 2
         stop_screen_recording
         stop_logcat
-        sleep 2
-        echo "Do you want to take bug report(y/n):"
+        
+        echo "Do you want to take bug report(y/n): "
         read -p "" start_confirmation
         
         if [[ $start_confirmation == "y" ]]; then
             trap 'exit' INT
             generate_bug_report
+            exit 1
         else
             exit 1
         fi
@@ -811,10 +785,10 @@ sleep 2
     fi
 done
 
+
             ;;
         8)
             echo "Exiting."
-            # Make sure to stop any background processes
             pkill -f screenrecord
             pkill -f logcat
             exit 0
@@ -824,6 +798,7 @@ done
             ;;
     esac
 done
+
 
 
 }
