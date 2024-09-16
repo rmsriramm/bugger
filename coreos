@@ -548,7 +548,7 @@ done
 
 # Function for the third script's functionality
 To_Collect_Bug_Filing_required_files() {
-  #!/bin/bash
+ #!/bin/bash
 
 # Define colors for output
 RED='\033[0;31m'
@@ -616,8 +616,7 @@ screenshot_filename="screenshot_$timestamp.png"
 
 # Function to take a screenshot
 take_screenshot() {
-    timestamp=$(date +%Y%m%d_%H%M%S)
-    screenshot_filename="screenshot_$timestamp.png"
+    local screenshot_filename="screenshot_$(date +%Y%m%d_%H%M%S).png"
     echo "Taking screenshot..."
     adb -s "$DEVICE_SERIAL" shell screencap -p /data/local/tmp/$screenshot_filename
     adb -s "$DEVICE_SERIAL" pull /data/local/tmp/$screenshot_filename . > /dev/null
@@ -695,6 +694,17 @@ Device_info() {
     printf "\033[0;31mModulemetadata version:\033[0m %s\n" "$Moduemetadata_version"
 }
 
+# Function to handle termination signals
+cleanup() {
+    echo "Terminating processes..."
+    pkill -f screenrecord
+    pkill -f logcat
+    exit 0
+}
+
+# Trap SIGINT and SIGTERM to ensure cleanup
+trap cleanup SIGINT SIGTERM
+
 # Main menu for user selection
 while true; do
     echo "Select the action to perform:"
@@ -712,12 +722,13 @@ while true; do
         1)
             start_screen_recording
             echo "Tap \033[0;31m'x'\033[0m to stop Screen recording."
-            read -r -n1 key
-            if [[ $key == "x" ]]; then
-                stop_screen_recording
-            else
-                echo -e "${RED}Invalid input. Exiting.${NC}"
-            fi
+            while true; do
+                read -r -n1 key
+                if [[ $key == "x" ]]; then
+                    stop_screen_recording
+                    break
+                fi
+            done
             ;;
         2)
             take_screenshot
@@ -727,13 +738,14 @@ while true; do
             ;;
         4)
             start_logcat
-            echo "Tap \033[0;31m'x'\033[0m to Stop Logcat."
-            read -r -n1 key
-            if [[ $key == "x" ]]; then
-                stop_logcat
-            else
-                echo -e "${RED}Invalid input. Exiting.${NC}"
-            fi
+            echo "Tap \033[0;31m'x'\033[0m to stop Logcat."
+            while true; do
+                read -r -n1 key
+                if [[ $key == "x" ]]; then
+                    stop_logcat
+                    break
+                fi
+            done
             ;;
         5)
             generate_bug_report
@@ -745,8 +757,8 @@ while true; do
             Device_info
             start_screen_recording
             start_logcat
-            printf "Tap \033[0;31m's'\033[0m to take a screenshot.\n"
-            printf "Tap \033[0;31m'x'\033[0m to stop Screen recording and Logcat.\n"
+            echo "Tap \033[0;31m's'\033[0m to take a screenshot."
+            echo "Tap \033[0;31m'x'\033[0m to stop Screen recording and Logcat."
 
             while true; do
                 read -r -n1 key
@@ -769,18 +781,13 @@ while true; do
             ;;
         8)
             echo "Exiting."
-            pkill -f screenrecord
-            pkill -f logcat
-            exit 0
+            cleanup
             ;;
         *)
             echo "Invalid selection. Please try again."
             ;;
     esac
 done
-
-
-
 }
 
 sideload() {
