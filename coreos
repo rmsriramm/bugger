@@ -764,6 +764,7 @@ while true; do
                 read -r -n1 key
 
                 if [[ $key == 'v' ]]; then
+sleep 1
                     take_screenshot
                 elif [[ $key == 'x' ]]; then
                     stop_screen_recording
