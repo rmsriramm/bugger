@@ -546,250 +546,6 @@ done
 
 }
 
-# Function for the third script's functionality
-To_Collect_Bug_Filing_required_files() {
- #!/bin/bash
-
-# Define colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
-# Device selection logic
-echo "Devices available:"
-DEVICES=$(adb devices -l | grep -v "List of devices attached" | grep -v "^$")
-echo "$DEVICES"
-
-if [ -z "$DEVICES" ]; then
-    echo "Error: No devices connected."
-    exit 1
-fi
-
-# Prepare arrays to map serial numbers to device names
-DEVICE_LIST=()
-DEVICE_NAMES=()
-
-# Populate the arrays with serial numbers and device names
-while IFS= read -r line; do
-    SERIAL=$(echo "$line" | awk '{print $1}')
-    if [ -n "$SERIAL" ]; then
-        DEVICE_NAME=$(echo "$line" | sed -e "s/^[^ ]* \(.*\)$/\1/")
-        DEVICE_LIST+=("$SERIAL")
-        DEVICE_NAMES+=("$DEVICE_NAME")
-    fi
-done <<< "$DEVICES"
-
-# Display devices and prompt for selection
-if [ ${#DEVICE_LIST[@]} -gt 1 ]; then
-    echo "Multiple devices connected. Please select one:"
-    PS3="Enter the number of your choice: "
-    select DEVICE_SERIAL in "${DEVICE_LIST[@]}"; do
-        if [ -n "$DEVICE_SERIAL" ]; then
-            for i in "${!DEVICE_LIST[@]}"; do
-                if [ "${DEVICE_LIST[$i]}" = "$DEVICE_SERIAL" ]; then
-                    DEVICE_NAME="${DEVICE_NAMES[$i]}"
-                    break
-                fi
-            done
-            echo "Selected device: $DEVICE_NAME ($DEVICE_SERIAL)"
-            break
-        else
-            echo "Invalid selection. Please try again."
-        fi
-    done
-elif [ ${#DEVICE_LIST[@]} -eq 1 ]; then
-    DEVICE_SERIAL="${DEVICE_LIST[0]}"
-    DEVICE_NAME="${DEVICE_NAMES[0]}"
-    echo "Only one device connected: $DEVICE_NAME ($DEVICE_SERIAL)"
-else
-    echo "Error: No devices available for selection."
-    exit 1
-fi
-
-echo "Using device: $DEVICE_NAME ($DEVICE_SERIAL)"
-
-# Define filenames with timestamps
-timestamp=$(date +%Y%m%d_%H%M%S)
-video_filename="/data/local/tmp/video_$timestamp.mp4"
-log_filename="logcat_$timestamp.txt"
-screenshot_filename="screenshot_$timestamp.png"
-
-# Function to take a screenshot
-take_screenshot() {
-    local screenshot_filename="screenshot_$(date +%Y%m%d_%H%M%S).png"
-    echo "Taking screenshot..."
-    adb -s "$DEVICE_SERIAL" shell screencap -p /data/local/tmp/$screenshot_filename
-    adb -s "$DEVICE_SERIAL" pull /data/local/tmp/$screenshot_filename . > /dev/null
-    echo "Screenshot saved as $screenshot_filename"
-}
-
-# Function to start screen recording
-start_screen_recording() {
-    echo "Do you want to start screen recording (y/n): "
-    read -p "" start_confirmation
-
-    if [[ $start_confirmation == "y" ]]; then
-        echo "Starting screen recording..."
-        adb -s "$DEVICE_SERIAL" shell screenrecord /data/local/tmp/video.mp4 &
-        record_pid=$!
-    else
-        echo "Exiting."
-        exit 0
-    fi
-}
-
-# Function to stop screen recording
-stop_screen_recording() {
-    echo "Stopping screen recording..."
-    adb -s "$DEVICE_SERIAL" shell pkill -SIGINT screenrecord
-    sleep 5
-    adb -s "$DEVICE_SERIAL" pull /data/local/tmp/video.mp4 . > /dev/null
-    echo "Recording saved as video.mp4"
-}
-
-# Function to start logcat
-start_logcat() {
-    echo "Starting logcat..."
-    adb -s "$DEVICE_SERIAL" logcat > $log_filename 2>&1 &
-    logcat_pid=$!
-}
-
-# Function to stop logcat
-stop_logcat() {
-    echo "Stopping logcat..."
-    kill -9 $logcat_pid
-    echo "Logcat saved as $log_filename"
-}
-
-# Function to generate a bug report
-generate_bug_report() {
-    timestamp=$(date +%Y%m%d_%H%M%S)
-    echo "Generating bug report..."
-    adb -s "$DEVICE_SERIAL" bugreport > bugreport_$timestamp.txt
-    echo "Bug report saved as bugreport_$timestamp.txt"
-    exit 1
-}
-
-# Function to start cross reboot logs
-cross_reboot_logs() {
-    echo "Started cross reboot logs"
-    while true; do
-        adb logcat | tee -a crosslogs.txt
-        echo "==========REBOOT============" >> crosslogs.txt
-        echo "CTRL+C to stop the Cross reboot logs"
-    done
-}
-
-# Device_Info
-Device_info() {
-    Device_fingerprint=$(adb -s "$DEVICE_SERIAL" shell getprop | grep ro.build.fingerprint)
-    Android_Version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.build.version.release)
-    Playstore_version=$(adb -s "$DEVICE_SERIAL" shell dumpsys package com.android.vending | grep versionName | head -1 | cut -d'=' -f2)
-    hardware_version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.boot.hardware.revision)
-    Moduemetadata_version=$(adb -s "$DEVICE_SERIAL" shell dumpsys package com.google.android.modulemetadata | grep -E "versionCode" | awk -F 'versionCode=' '{print $2}' | awk -F ' ' '{print $1}' | sort -nr | head -n 1)
-    printf "\033[0;31mDevice Fingerprint:\033[0m %s\n" "$Device_fingerprint"
-    printf "\033[0;31mAndroid Version:\033[0m %s\n" "$Android_Version"
-    printf "\033[0;31mPlaystore Version:\033[0m %s\n" "$Playstore_version"
-    printf "\033[0;31mHardware Version:\033[0m %s\n" "$hardware_version"
-    printf "\033[0;31mModulemetadata version:\033[0m %s\n" "$Moduemetadata_version"
-}
-
-# Function to handle termination signals
-cleanup() {
-    echo "Terminating processes..."
-    pkill -f screenrecord
-    pkill -f logcat
-    exit 0
-}
-
-# Trap SIGINT and SIGTERM to ensure cleanup
-trap cleanup SIGINT SIGTERM
-
-# Main menu for user selection
-while true; do
-    echo "Select the action to perform:"
-    echo "1) Screen Recording"
-    echo "2) Take Screenshot"
-    echo "3) Cross reboot logs"
-    echo "4) Logcat"
-    echo "5) Bug Report"
-    echo "6) Show Device Info"
-    echo "7) Collect (Screen Recording, Screenshot, Logcat, Bug Report) Together"
-    echo "8) Exit"
-
-    read -p "Enter your choice (1-8): " choice
-    case $choice in
-        1)
-            start_screen_recording
-            echo "Tap \033[0;31m'x'\033[0m to stop Screen recording."
-            while true; do
-                read -r -n1 key
-                if [[ $key == "x" ]]; then
-                    stop_screen_recording
-                    break
-                fi
-            done
-            ;;
-        2)
-            take_screenshot
-            ;;
-        3)
-            cross_reboot_logs
-            ;;
-        4)
-            start_logcat
-            echo "Tap \033[0;31m'x'\033[0m to stop Logcat."
-            while true; do
-                read -r -n1 key
-                if [[ $key == "x" ]]; then
-                    stop_logcat
-                    break
-                fi
-            done
-            ;;
-        5)
-            generate_bug_report
-            ;;
-        6)
-            Device_info
-            ;;
-        7)
-            Device_info
-            start_screen_recording
-            start_logcat
-            printf "Tap \033[0;31m'v'\033[0m to take a screenshot.\n"
-            printf "Tap \033[0;31m'x'\033[0m to stop Screen recording and Logcat.\n"
-
-            while true; do
-                read -r -n1 key
-
-                if [[ $key == 'v' ]]; then
-sleep 1
-                    take_screenshot
-                elif [[ $key == 'x' ]]; then
-                    stop_screen_recording
-                    stop_logcat
-
-                    echo "Do you want to take a bug report (y/n): "
-                    read -p "" start_confirmation
-
-                    if [[ $start_confirmation == "y" ]]; then
-                        generate_bug_report
-                    fi
-                    break
-                fi
-            done
-            ;;
-        8)
-            echo "Exiting."
-            cleanup
-            ;;
-        *)
-            echo "Invalid selection. Please try again."
-            ;;
-    esac
-done
-}
 
 sideload() {
 #!/bin/bash
@@ -1246,9 +1002,8 @@ echo "Which scripts you want to execute:"
 echo "1. Sideload"
 echo "2. Rollback"
 echo "3. Install Applications"
-echo "4. Bug filling required files"
-echo "5. Apex Multiuser_BA"
-echo "6. Apex Multiuser Go"
+echo "4. Apex Multiuser_BA"
+echo "5. Apex Multiuser Go"
 
 # Prompt the user for their choice
 read -p "Enter the number of the script to execute (1-6): " choice
@@ -1256,16 +1011,13 @@ read -p "Enter the number of the script to execute (1-6): " choice
 # Execute the corresponding function based on user input
 case $choice in
     
-    5)
+    4)
         Apex_multiuser_BA
         ;;
-    6)
+    5)
         Apex_multiuser_Go
         ;;
-    4)
-        To_Collect_Bug_Filing_required_files
-        ;;
-        
+   
     1)
         sideload
         ;;
