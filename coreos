@@ -757,8 +757,8 @@ while true; do
             Device_info
             start_screen_recording
             start_logcat
-            echo "Tap \033[0;31m'v'\033[0m to take a screenshot."
-            echo "Tap \033[0;31m'x'\033[0m to stop Screen recording and Logcat."
+            printf "Tap \033[0;31m'v'\033[0m to take a screenshot.\n"
+            printf "Tap \033[0;31m'x'\033[0m to stop Screen recording and Logcat.\n"
 
             while true; do
                 read -r -n1 key
