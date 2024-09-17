@@ -143,12 +143,12 @@ Device_fingerprint=$(adb -s "$DEVICE_SERIAL" shell getprop | grep ro.build.finge
             Android_Version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.build.version.release)
             Playstore_version=$(adb -s "$DEVICE_SERIAL" shell dumpsys package com.android.vending | grep versionName | head -1 | cut -d'=' -f2)
             hardware_version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.boot.hardware.revision)
-            Moduemetadata_version=$(adb -s "$DEVICE_SERIAL" shell dumpsys package com.google.android.modulemetadata | grep -E "versionCode" | awk -F 'versionCode=' '{print $2}' | awk -F ' ' '{print $1}' | sort -nr | head -n 1)
+            sdk_version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.build.version.sdk)
             printf "\033[0;31mDevice Fingerprint:\033[0m %s\n" "$Device_fingerprint"
             printf "\033[0;31mAndroid Version:\033[0m %s\n" "$Android_Version"
             printf "\033[0;31mPlaystore Version:\033[0m %s\n" "$Playstore_version"
+            printf "\033[0;31mSDK Version:\033[0m %s\n" "$sdk_version"
             printf "\033[0;31mHardware Version:\033[0m %s\n" "$hardware_version"
-            printf "\033[0;31mModulemetadata version:\033[0m %s\n" "$Moduemetadata_version"
            
 }
 
