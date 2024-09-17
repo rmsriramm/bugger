@@ -222,12 +222,22 @@ while true; do
             exit 1
             ;;
         7)
-           printf "Tap \033[0;31m's'\033[0m to take a screenshot.\n"
-printf "Tap \033[0;31m'x'\033[0m to stop Screen recording and Logcat.\n"
-
+           
+Device_fingerprint=$(adb -s "$DEVICE_SERIAL" shell getprop | grep ro.build.fingerprint)
+            Android_Version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.build.version.release)
+            Playstore_version=$(adb -s "$DEVICE_SERIAL" shell dumpsys package com.android.vending | grep versionName | head -1 | cut -d'=' -f2)
+            hardware_version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.boot.hardware.revision)
+            sdk_version=$(adb -s "$DEVICE_SERIAL" shell getprop ro.build.version.sdk)
+            printf "\033[0;31mDevice Fingerprint:\033[0m %s\n" "$Device_fingerprint"
+            printf "\033[0;31mAndroid Version:\033[0m %s\n" "$Android_Version"
+            printf "\033[0;31mPlaystore Version:\033[0m %s\n" "$Playstore_version"
+            printf "\033[0;31mSDK Version:\033[0m %s\n" "$sdk_version"
+            printf "\033[0;31mHardware Version:\033[0m %s\n" "$hardware_version"
 
 startrecord
 logcat
+printf "Tap \033[0;31m's'\033[0m to take a screenshot.\n"
+printf "Tap \033[0;31m'x'\033[0m to stop Screen recording and Logcat.\n"
 
 while true; do
     read -r -n1 key  # Read a single character
