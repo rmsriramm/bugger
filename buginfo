@@ -152,6 +152,218 @@ Device_fingerprint=$(adb -s "$DEVICE_SERIAL" shell getprop | grep ro.build.finge
            
 }
 
+push() {
+#!/bin/bash
+
+# Function to install fzf (for Linux and macOS)
+install_fzf() {
+    echo "fzf not found. Installing fzf..."
+
+    # Check if the system is Linux or macOS
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        # Linux (Debian/Ubuntu)
+        sudo apt-get update
+        sudo apt-get install -y fzf
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        brew install fzf
+    else
+        echo "Automatic installation of fzf is not supported for this OS. Please install manually."
+        exit 1
+    fi
+}
+
+# Function to navigate directories interactively and select a file
+navigate_directories() {
+    local current_dir="/storage/emulated/0"  # Starting point in Android
+    local selected_item=""
+
+    # List files and directories recursively from the starting directory
+    while true; do
+        # Use adb to list files and directories in the current directory (including hidden files)
+        selected_item=$(adb shell "ls -a -p $current_dir" | fzf --multi --preview "adb shell ls -l $current_dir/{}" --prompt="Press TAB to select multiple files: ")
+
+        # If no selection is made (empty string or exit), exit
+        if [ -z "$selected_item" ]; then
+            echo "No file or directory selected. Exiting."
+            exit 1  # exit the script if no valid selection
+        fi
+
+        # Clean up the selected items to avoid misinterpretation of invalid values
+        selected_item=$(echo "$selected_item" | sed 's/^[ \t]*//;s/[ \t]*$//')  # trim leading/trailing spaces
+
+        # Check if the selected item is something invalid (e.g., "No", "Exiting", or other prompt-related text)
+        if [[ "$selected_item" == "Exiting" || "$selected_item" == "No" || "$selected_item" == "Press" || "$selected_item" == "Cancel" ]]; then
+            echo "Invalid selection (cancelled). Exiting."
+            exit 1
+        fi
+
+        # Check if the selected item is a directory
+        if adb shell "ls -ld $current_dir/$selected_item" | cut -d' ' -f1 | grep -q '^d'; then
+            # If it's a directory, go inside
+            current_dir="$current_dir/$selected_item"
+        else
+            # If it's a file, break and return the full file path
+            break
+        fi
+    done
+
+    # Clean the path, ensuring no double path issues
+    cleaned_path=$(echo "$current_dir/$selected_item" | sed 's|^/storage/emulated/0/|sdcard/|')
+
+    # Remove any leading or trailing slashes to prevent double slashes in the path
+    cleaned_path=$(echo "$cleaned_path" | sed 's|//|/|g')
+
+    # Avoid double path prefix issues by ensuring that `sdcard/` is used consistently
+    if [[ "$cleaned_path" == sdcard/* ]]; then
+        # This is already the correct relative path, so just return it
+        echo "$cleaned_path"
+    else
+        # If the path is not properly cleaned, use the full absolute path
+        echo "$current_dir/$selected_item"
+    fi
+}
+
+# Main Script Logic
+if ! command -v fzf &> /dev/null; then
+    # If fzf is not installed, attempt to install it
+    echo "fzf is not installed. Installing fzf..."
+    install_fzf
+fi
+
+# After ensuring fzf is installed, call navigate_directories
+file_paths=$(navigate_directories)
+
+# If no valid files are selected, don't proceed
+if [ -z "$file_paths" ]; then
+    echo "No file(s) selected. Exiting."
+    exit 1
+fi
+
+echo "Pulling file(s) from device: $file_paths"
+
+# Loop through each selected file and pull it one by one
+for file_path in $file_paths; do
+    # Check if the path is relative and needs the full directory path prepended
+    if [[ "$file_path" != sdcard/* ]]; then
+        # Prepend the correct path to the file (e.g., sdcard/DCIM/Camera/)
+        file_path="sdcard/DCIM/Camera/$file_path"
+    fi
+
+    # Output the file being pulled
+    echo "Pulling: $file_path"
+
+    # Attempt to pull the file from the device
+    adb -s "$DEVICE_SERIAL" pull "$file_path" || echo "Failed to pull $file_path"
+done
+}
+
+pull() {
+#!/bin/bash
+
+# Function to select multiple files or directories from the laptop
+select_multiple_files_or_directories_laptop() {
+    # Function to display a directory and let the user select files/folders inside
+    show_fzf_directory() {
+        local current_dir="$1"
+
+        # List the files and directories in the current directory
+        selected=$(find "$current_dir" -maxdepth 1 -type f -o -type d | fzf --multi --preview "ls -l {1}" --prompt="For multi selection use tab ,to selct the folder itself after navugate to folder click ESC: ")
+
+        # If no selection, return
+        if [ -z "$selected" ]; then
+            return
+        fi
+
+        # Add selected item(s) to the selected_items array
+        for item in $selected; do
+            selected_items+=("$item")
+        done
+
+        # Recurse into subdirectories if a directory is selected, without navigating automatically
+        for item in $selected; do
+            if [ -d "$item" ]; then
+                # Recurse into subdirectories to select files inside
+                show_fzf_directory "$item"
+            fi
+        done
+    }
+
+    # Start selection from the current directory
+    selected_items=()
+    show_fzf_directory "."
+
+    # Check if any files or directories were selected
+    if [ ${#selected_items[@]} -eq 0 ]; then
+        echo "No files or directories selected. Exiting."
+        exit 1
+    fi
+
+    # Display the selected items
+    echo "Selected: ${selected_items[@]}"
+}
+
+# Function to let the user choose the target directory on the Android device
+select_device_target_directory() {
+    # Use adb to list files and directories on the Android device
+    target_directory=$(adb shell "ls -d /storage/emulated/0/*" | fzf --prompt="Select target directory on the Android device: ")
+
+    # Check if a valid directory was selected
+    if [ -z "$target_directory" ]; then
+        echo "No target directory selected. Exiting."
+        exit 1
+    fi
+
+    echo "Target directory on Android: $target_directory"
+}
+
+# Function to push the selected files or directories to the Android device
+push_files_or_directories_to_device() {
+    # Loop through each selected item
+    for selected_item in "${selected_items[@]}"; do
+        # Ensure that the selected file or directory exists on the laptop
+        if [ ! -e "$selected_item" ]; then
+            echo "The selected item $selected_item does not exist on the laptop. Skipping."
+            continue
+        fi
+
+        # Push the selected file or directory to the target directory on the Android device
+        if [ -d "$selected_item" ]; then
+            # If it's a directory, push it recursively
+            echo "Pushing directory: $selected_item to $target_directory"
+            adb push "$selected_item" "$target_directory/"
+        else
+            # If it's a file, push it to the target directory
+            echo "Pushing file: $selected_item to $target_directory"
+            adb push "$selected_item" "$target_directory/"
+        fi
+
+        # Check if the push was successful
+        if [ $? -eq 0 ]; then
+            echo "Successfully pushed $selected_item to $target_directory"
+        else
+            echo "Error pushing $selected_item to $target_directory"
+        fi
+    done
+}
+
+# Main script logic
+echo "Welcome to the multi-selection file push script!"
+
+# Step 1: Select multiple files or directories from the laptop
+select_multiple_files_or_directories_laptop
+
+# Step 2: Select the target directory on the Android device
+select_device_target_directory
+
+# Step 3: Push the selected files or directories to the Android device
+push_files_or_directories_to_device
+
+echo "Finished pushing the selected files or directories."
+}
+
+
+# Main menu for user selection
 # Main menu for user selection
 while true; do
     echo "Select the action to perform:"
@@ -162,9 +374,11 @@ while true; do
     echo "5) Bug Report"
     echo "6) Show Device Info"
     echo "7) Collect (Screen Recording, Screenshot, Logcat, Bug Report) Together"
-    echo "8) Exit"
+    echo "8) pull the file from the device"
+    echo "9) Push the file to the device"
+    echo "10) Exit"
 
-    read -p "Enter your choice (1-8): " choice
+    read -p "Enter your choice (1-10): " choice
     case $choice in
         1)
             start_screen_recording
@@ -204,41 +418,43 @@ while true; do
             Device_info
             exit 1
             ;;
-          7)
-          
+        7)
+            Device_info
+            start_screen_recording
+            start_logcat
+            printf "Tap \033[0;31m's'\033[0m to take a screenshot.\n"
+            printf "Tap \033[0;31m'x'\033[0m to stop Screen recording and Logcat.\n"
 
-Device_info
-start_screen_recording
-start_logcat
- printf "Tap \033[0;31m's'\033[0m to take a screenshot.\n"
-printf "Tap \033[0;31m'x'\033[0m to stop Screen recording and Logcat.\n"
+            while true; do
+                read -r -n1 key  # Read a single character
 
-while true; do
-    read -r -n1 key  # Read a single character
-
-    if [[ $key == 's' ]]; then
-        take_screenshot
-    elif [[ $key == 'x' ]]; then
-        stop_screen_recording
-        stop_logcat
-        
-        echo "Do you want to take bug report(y/n): "
-        read -p "" start_confirmation
-        
-        if [[ $start_confirmation == "y" ]]; then
-            trap 'exit' INT
-            generate_bug_report
-            exit 1
-        else
-            exit 1
-        fi
-        break
-    fi
-done
-
-
+                if [[ $key == 's' ]]; then
+                    take_screenshot
+                elif [[ $key == 'x' ]]; then
+                    stop_screen_recording
+                    stop_logcat
+                    
+                    echo "Do you want to take a bug report (y/n): "
+                    read -p "" start_confirmation
+                    
+                    if [[ $start_confirmation == "y" ]]; then
+                        trap 'exit' INT
+                        generate_bug_report
+                        exit 1
+                    else
+                        exit 1
+                    fi
+                    break
+                fi
+            done
             ;;
         8)
+            push
+            ;;
+        9)
+            pull
+            ;;
+        10)
             echo "Exiting."
             pkill -f screenrecord
             pkill -f logcat
@@ -250,3 +466,6 @@ done
     esac
 done
 
+            ;;
+    esac
+done
