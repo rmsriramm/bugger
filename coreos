@@ -1,14 +1,11 @@
 #!/bin/bash
 
-# Function for the first script's functionality
-Apex_multiuser_BA() {
-    echo "Running Apex_multiuser_BA..."
-    RED='\033[0;31m'
+#Device selection
+RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
 
-# Ensure the script is executed on a Userdebug build
-echo "Make sure you use a Userdebug build"
+Device_selections() {
 
 echo "Devices available:"
 DEVICES=$(adb devices -l | grep -v "List of devices attached" | grep -v "^$")
@@ -61,6 +58,15 @@ else
     exit 1
 fi
 
+}
+
+# Function for the first script's functionality
+
+Apex_multiuser_BA() {
+Device_selections
+
+# Ensure the script is executed on a Userdebug build
+echo "Make sure you use a Userdebug build"
 
 echo "Creating second user"
 adb -s "$DEVICE_SERIAL" shell pm create-user "User Name" > /dev/null 2>&1
@@ -273,68 +279,7 @@ done
 
 # Function for the second script's functionality
 Apex_multiuser_Go() {
-    echo "Running Apex_multiuser_Go..."
-    #!/bin/bash
-
-# Define colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
-# Ensure the script is executed on a Userdebug build
-echo "Make sure you use a Userdebug build and only for Go Devices "
-
-echo "Devices available:"
-DEVICES=$(adb devices -l | grep -v "List of devices attached" | grep -v "^$")
-echo "$DEVICES"
-
-if [ -z "$DEVICES" ]; then
-    echo "Error: No devices connected."
-    exit 1
-fi
-
-# Prepare arrays to map serial numbers to device names
-DEVICE_LIST=()
-DEVICE_NAMES=()
-
-# Populate the arrays with serial numbers and device names
-while IFS= read -r line; do
-    SERIAL=$(echo "$line" | awk '{print $1}')
-    if [ -n "$SERIAL" ]; then
-        DEVICE_NAME=$(echo "$line" | sed -e "s/^[^ ]* \(.*\)$/\1/")
-        DEVICE_LIST+=("$SERIAL")
-        DEVICE_NAMES+=("$DEVICE_NAME")
-    fi
-done <<< "$DEVICES"
-
-# Display devices and prompt for selection
-if [ ${#DEVICE_LIST[@]} -gt 1 ]; then
-    echo "Multiple devices connected. Please select one:"
-    PS3="Enter the number of your choice: "
-    select DEVICE_SERIAL in "${DEVICE_LIST[@]}"; do
-        if [ -n "$DEVICE_SERIAL" ]; then
-            for i in "${!DEVICE_LIST[@]}"; do
-                if [ "${DEVICE_LIST[$i]}" = "$DEVICE_SERIAL" ]; then
-                    DEVICE_NAME="${DEVICE_NAMES[$i]}"
-                    break
-                fi
-            done
-            echo "Selected device: $DEVICE_NAME ($DEVICE_SERIAL)"
-            break
-        else
-            echo "Invalid selection. Please try again."
-        fi
-    done
-elif [ ${#DEVICE_LIST[@]} -eq 1 ]; then
-    # Single device case
-    DEVICE_SERIAL="${DEVICE_LIST[0]}"
-    DEVICE_NAME="${DEVICE_NAMES[0]}"
-    echo "Only one device connected: $DEVICE_NAME ($DEVICE_SERIAL)"
-else
-    echo "Error: No devices available for selection."
-    exit 1
-fi
-
+Device_selections
 
 echo "Creating second user"
 adb -s "$DEVICE_SERIAL" shell pm create-user "User Name" > /dev/null 2>&1
@@ -548,11 +493,15 @@ done
 
 
 sideload() {
+Device_selections
+
 #!/bin/bash
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
+
+Device_selections
 
 # Determine the current working directory
 CURRENT_DIR=$(pwd)
@@ -569,57 +518,6 @@ if [ -z "$BUNDLETOOL_JAR" ]; then
     exit 1
 fi
 
-# List connected devices with details
-echo "Devices available:"
-DEVICES=$(adb devices -l | grep -v "List of devices attached" | grep -v "^$")
-echo "$DEVICES"
-
-if [ -z "$DEVICES" ]; then
-    echo "Error: No devices connected."
-    exit 1
-fi
-
-# Prepare arrays to map serial numbers to device names
-DEVICE_LIST=()
-DEVICE_NAMES=()
-
-# Populate the arrays with serial numbers and device names
-while IFS= read -r line; do
-    SERIAL=$(echo "$line" | awk '{print $1}')
-    if [ -n "$SERIAL" ]; then
-        DEVICE_NAME=$(echo "$line" | sed -e "s/^[^ ]* \(.*\)$/\1/")
-        DEVICE_LIST+=("$SERIAL")
-        DEVICE_NAMES+=("$DEVICE_NAME")
-    fi
-done <<< "$DEVICES"
-
-# Display devices and prompt for selection
-if [ ${#DEVICE_LIST[@]} -gt 1 ]; then
-    echo "Multiple devices connected. Please select one:"
-    PS3="Enter the number of your choice: "
-    select DEVICE_SERIAL in "${DEVICE_LIST[@]}"; do
-        if [ -n "$DEVICE_SERIAL" ]; then
-            for i in "${!DEVICE_LIST[@]}"; do
-                if [ "${DEVICE_LIST[$i]}" = "$DEVICE_SERIAL" ]; then
-                    DEVICE_NAME="${DEVICE_NAMES[$i]}"
-                    break
-                fi
-            done
-            echo "Selected device: $DEVICE_NAME ($DEVICE_SERIAL)"
-            break
-        else
-            echo "Invalid selection. Please try again."
-        fi
-    done
-elif [ ${#DEVICE_LIST[@]} -eq 1 ]; then
-    # Single device case
-    DEVICE_SERIAL="${DEVICE_LIST[0]}"
-    DEVICE_NAME="${DEVICE_NAMES[0]}"
-    echo "Only one device connected: $DEVICE_NAME ($DEVICE_SERIAL)"
-else
-    echo "Error: No devices available for selection."
-    exit 1
-fi
 
 echo "Using device: $DEVICE_NAME ($DEVICE_SERIAL)"
 
@@ -644,14 +542,9 @@ else
     echo -e "${RED}Thank you.${NC}"
 fi
 }
+
 Install_apks(){
-#!/bin/bash
-
-# ANSI color codes
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
-
+Device_selections
 # Directory where APK files are stored
 APK_DIR=$(pwd)
 
@@ -677,59 +570,6 @@ install_all_apks() {
         install_apk "$apk_file"
     done
 }
-
-# List connected devices with details
-echo "Devices available:"
-DEVICES=$(adb devices -l | grep -v "List of devices attached" | grep -v "^$")
-echo "$DEVICES"
-
-if [ -z "$DEVICES" ]; then
-    echo "Error: No devices connected."
-    exit 1
-fi
-
-# Prepare arrays to map serial numbers to device names
-DEVICE_LIST=()
-DEVICE_NAMES=()
-
-# Populate the arrays with serial numbers and device names
-while IFS= read -r line; do
-    SERIAL=$(echo "$line" | awk '{print $1}')
-    if [ -n "$SERIAL" ]; then
-        DEVICE_NAME=$(echo "$line" | sed -e "s/^[^ ]* \(.*\)$/\1/")
-        DEVICE_LIST+=("$SERIAL")
-        DEVICE_NAMES+=("$DEVICE_NAME")
-    fi
-done <<< "$DEVICES"
-
-# Display devices and prompt for selection
-if [ ${#DEVICE_LIST[@]} -gt 1 ]; then
-    echo "Multiple devices connected. Please select one:"
-    PS3="Enter the number of your choice: "
-    select DEVICE_SERIAL in "${DEVICE_LIST[@]}"; do
-        if [ -n "$DEVICE_SERIAL" ]; then
-            for i in "${!DEVICE_LIST[@]}"; do
-                if [ "${DEVICE_LIST[$i]}" = "$DEVICE_SERIAL" ]; then
-                    DEVICE_NAME="${DEVICE_NAMES[$i]}"
-                    break
-                fi
-            done
-            echo "Selected device: $DEVICE_NAME ($DEVICE_SERIAL)"
-            break
-        else
-            echo "Invalid selection. Please try again."
-        fi
-    done
-elif [ ${#DEVICE_LIST[@]} -eq 1 ]; then
-    # Single device case
-    DEVICE_SERIAL="${DEVICE_LIST[0]}"
-    DEVICE_NAME="${DEVICE_NAMES[0]}"
-    echo "Only one device connected: $DEVICE_NAME ($DEVICE_SERIAL)"
-else
-    echo "Error: No devices available for selection."
-    exit 1
-fi
-
 echo "Using device: $DEVICE_NAME ($DEVICE_SERIAL)"
 
 # List APK files in the directory
@@ -795,60 +635,7 @@ echo "Installation process completed."
 
 }
 Rollback() {
-#!/bin/bash
-
-# List connected devices with details
-echo "Devices available:"
-DEVICES=$(adb devices -l | grep -v "List of devices attached" | grep -v "^$")
-echo "$DEVICES"
-
-if [ -z "$DEVICES" ]; then
-    echo "Error: No devices connected."
-    exit 1
-fi
-
-# Prepare arrays to map serial numbers to device names
-DEVICE_LIST=()
-DEVICE_NAMES=()
-
-# Populate the arrays with serial numbers and device names
-while IFS= read -r line; do
-    SERIAL=$(echo "$line" | awk '{print $1}')
-    if [ -n "$SERIAL" ]; then
-        DEVICE_NAME=$(echo "$line" | sed -e "s/^[^ ]* \(.*\)$/\1/")
-        DEVICE_LIST+=("$SERIAL")
-        DEVICE_NAMES+=("$DEVICE_NAME")
-    fi
-done <<< "$DEVICES"
-
-# Display devices and prompt for selection
-if [ ${#DEVICE_LIST[@]} -gt 1 ]; then
-    echo "Multiple devices connected. Please select one:"
-    PS3="Enter the number of your choice: "
-    select DEVICE_SERIAL in "${DEVICE_LIST[@]}"; do
-        if [ -n "$DEVICE_SERIAL" ]; then
-            for i in "${!DEVICE_LIST[@]}"; do
-                if [ "${DEVICE_LIST[$i]}" = "$DEVICE_SERIAL" ]; then
-                    DEVICE_NAME="${DEVICE_NAMES[$i]}"
-                    break
-                fi
-            done
-            echo "Selected device: $DEVICE_NAME ($DEVICE_SERIAL)"
-            break
-        else
-            echo "Invalid selection. Please try again."
-        fi
-    done
-elif [ ${#DEVICE_LIST[@]} -eq 1 ]; then
-    # Single device case
-    DEVICE_SERIAL="${DEVICE_LIST[0]}"
-    DEVICE_NAME="${DEVICE_NAMES[0]}"
-    echo "Only one device connected: $DEVICE_NAME ($DEVICE_SERIAL)"
-else
-    echo "Error: No devices available for selection."
-    exit 1
-fi
-
+Device_selections
 # Function to rollback individual Big_Android trains
 Big_Android() {
     echo "Select the Big_Android module to rollback:"
@@ -996,6 +783,259 @@ while true; do
     esac
 done
 }
+ROR(){
+Device_selections
+echo "Using device: $DEVICE_NAME ($DEVICE_SERIAL)"
+
+ROR_Setup() {
+echo "Executing reboot readliness command"
+
+adb -s "$DEVICE_SERIAL" shell device_config put reboot_readiness idle_polling_interval_ms 10000 &&
+adb -s "$DEVICE_SERIAL" shell device_config put reboot_readiness active_polling_interval_ms 10000 &&
+adb -s "$DEVICE_SERIAL" shell device_config put reboot_readiness interactivity_threshold_ms 60000 &&
+adb -s "$DEVICE_SERIAL" shell device_config put reboot_readiness disable_app_activity_check true
+
+sleep 5 
+
+echo "Running logcat to verfiy the ROR logs"
+
+(caffeine &) && adb -s "$DEVICE_SERIAL" logcat | grep -e "SSM:" -e "SysU:" -e "RH:" -e "UChk::Mainline:"
+
+}
+After_ROR(){
+command_output1=$(adb -s "$DEVICE_SERIAL" shell dumpsys activity | grep LOCKED)
+
+# Check if the output exactly matches RUNNING_UNLOCKED
+if echo "$command_output1" | grep -q "User #0: state=RUNNING_UNLOCKED"; then
+    echo -e "${GREEN}Test passed. The output is RUNNING_UNLOCKED.${NC}"
+    exit 1
+else
+    echo -e "${RED}Test failed. The output is not RUNNING_UNLOCKED. Current output: $command_output1${NC}"
+    exit 1
+fi
+}
+# Main menu for user selection
+while true; do
+    echo "Select the action to perform:"
+    echo "1) ROR_Setup"
+    echo "2) After ROR device reboot locked status check"
+    echo "3) Exit"
+
+    read -p "Enter your choice (1-3): " choice
+    case $choice in
+        1)
+           ROR_Setup
+            ;;
+        2)
+           After_ROR
+            ;;
+      
+        3)
+            echo "Exiting."
+            exit 0
+            ;;
+        *)
+            echo "Invalid selection. Please try again."
+            ;;
+    esac
+done
+}
+Bulk_files_creation() {
+#!/bin/bash
+
+# Function to check and install missing packages
+install_package() {
+    package_name=$1
+    if ! dpkg -l | grep -q "$package_name"; then
+        echo "$package_name is not installed. Installing..."
+        sudo apt-get update
+        sudo apt-get install -y "$package_name"
+    else
+        echo "$package_name is already installed."
+    fi
+}
+
+# Function to generate images
+generate_images() {
+    # Get the current directory using pwd
+    current_dir=$(pwd)
+
+    # Directory where images will be saved (current directory)
+    output_dir="$current_dir/test_images"
+
+    # Create the output directory if it doesn't exist
+    mkdir -p "$output_dir"
+
+    # Prompt the user for the number of images to generate
+    echo "How many images would you like to generate?"
+    read -p "Enter the total number of images: " num_images
+
+    # Validate the input (ensure it's a number and greater than 0)
+    if ! [[ "$num_images" =~ ^[0-9]+$ ]] || [ "$num_images" -le 0 ]; then
+        echo "Invalid input. Please enter a valid number greater than 0."
+        exit 1
+    fi
+
+    # Image size and dimensions (32x32 pixels for small size)
+    width=32
+    height=32
+
+    # Loop to create the images
+    for ((i=1; i<=num_images; i++)); do
+        # Generate random color (in hex format)
+        color=$(printf "#%02X%02X%02X" $((RANDOM % 256)) $((RANDOM % 256)) $((RANDOM % 256)))
+
+        # Image filename (e.g., image_1.png, image_2.png, etc.)
+        filename="$output_dir/image_$i.png"
+
+        # Create the image using ImageMagick
+        convert -size ${width}x${height} xc:$color "$filename"
+
+    done
+
+    echo "Created $num_images images in $output_dir"
+}
+
+# Function to generate music
+generate_music() {
+    # Get the current directory using pwd
+    current_dir=$(pwd)
+
+    # Prompt the user for the total number of music files to generate
+    echo "How many music files would you like to generate?"
+    read -p "Enter the total number of music files: " num_music_files
+
+    # Validate the input (ensure it's a number and greater than 0)
+    if ! [[ "$num_music_files" =~ ^[0-9]+$ ]] || [ "$num_music_files" -le 0 ]; then
+        echo "Invalid input. Please enter a valid number greater than 0."
+        exit 1
+    fi
+
+    # Music file format (MP3)
+    music_format="mp3"
+
+    # Directory for all the generated music files (single folder)
+    music_dir="$current_dir/test_music"
+
+    # Create the music directory if it doesn't exist
+    mkdir -p "$music_dir"
+
+    # Generate music files using ffmpeg with random sine wave tones
+    for ((i=1; i<=num_music_files; i++)); do
+        # Generate a random frequency between 100 and 1000 Hz
+        frequency=$((RANDOM % 901 + 100))
+        
+        # Generate a music file name
+        music_file="$music_dir/music_file_$i.$music_format"
+        
+        # Generate a 5-second sine wave with the random frequency using ffmpeg
+        ffmpeg -f lavfi -t 5 -i "sine=frequency=$frequency:duration=5" -ac 2 -ar 44100 "$music_file" -y
+        
+        echo "Generated: $music_file with frequency $frequency Hz"
+    done
+
+    echo "Generated $num_music_files music files in the '$music_dir' folder."
+}
+
+# Function to generate videos
+generate_videos() {
+    # Get the current directory using pwd
+    current_dir=$(pwd)
+
+    # Directory where videos will be saved (current directory)
+    output_dir="$current_dir/test_videos"
+
+    # Create the output directory if it doesn't exist
+    mkdir -p "$output_dir"
+
+    # Prompt the user for the number of video files to generate
+    echo "How many video files would you like to generate?"
+    read -p "Enter the total number of video files: " num_videos
+
+    # Validate the input (ensure it's a number and greater than 0)
+    if ! [[ "$num_videos" =~ ^[0-9]+$ ]] || [ "$num_videos" -le 0 ]; then
+        echo "Invalid input. Please enter a valid number greater than 0."
+        exit 1
+    fi
+
+    # Prompt the user for the path of the MP3 audio file
+    echo "Please provide the path to the audio file (MP3 format, or leave blank to generate without audio):"
+    read -p "Enter the audio file path: " audio_file
+
+    # Validate the audio file path if it's provided
+    if [[ -n "$audio_file" ]]; then
+        if ! [[ -f "$audio_file" && "$audio_file" =~ \.mp3$ ]]; then
+            echo "Invalid audio file path or file type. Please ensure the file exists and is an MP3."
+            exit 1
+        fi
+        # Video duration (in seconds) based on the duration of the audio file
+        audio_duration=$(ffmpeg -i "$audio_file" 2>&1 | grep "Duration" | awk '{print $2}' | tr -d ,)
+        duration_seconds=$(echo $audio_duration | awk -F: '{print ($1 * 3600) + ($2 * 60) + $3}')
+    else
+        # If no audio is provided, set a default duration (e.g., 10 seconds)
+        duration_seconds=10
+    fi
+
+    # Video size and dimensions (e.g., 640x480 for standard resolution)
+    width=640
+    height=480
+
+    # Loop to create the videos
+    for ((i=1; i<=num_videos; i++)); do
+        # Generate random color (in hex format)
+        color=$(printf "#%02X%02X%02X" $((RANDOM % 256)) $((RANDOM % 256)) $((RANDOM % 256)))
+
+        # Video filename (e.g., video_1.mp4, video_2.mp4, etc.)
+        filename="$output_dir/video_$i.mp4"
+
+        if [[ -n "$audio_file" ]]; then
+            # Generate the video with a random color background and audio
+            ffmpeg -f lavfi -t $duration_seconds -i "color=$color:s=${width}x${height}:d=$duration_seconds" -i "$audio_file" -c:v libx264 -c:a aac -strict experimental "$filename" -y
+        else
+            # Generate the video with just a random color background (no audio)
+            ffmpeg -f lavfi -t $duration_seconds -i "color=$color:s=${width}x${height}:d=$duration_seconds" "$filename" -y
+        fi
+
+        echo "Generated: $filename"
+    done
+
+    echo "Generated $num_videos video files in the '$output_dir' folder."
+}
+
+# Install missing dependencies
+install_package "imagemagick"
+install_package "ffmpeg"
+
+# Interactive menu
+while true; do
+    echo "Choose what you want to generate:"
+    echo "1. Generate Images"
+    echo "2. Generate Music Files"
+    echo "3. Generate Video Files"
+    echo "4. Exit"
+
+    read -p "Enter your choice (1/2/3/4): " choice
+
+    case $choice in
+        1) 
+            generate_images
+            ;;
+        2)
+            generate_music
+            ;;
+        3)
+            generate_videos
+            ;;
+        4)
+            echo "Exiting..."
+            exit 0
+            ;;
+        *)
+            echo "Invalid choice. Please choose again."
+            ;;
+    esac
+done
+}
 
 # Display available options
 echo "Which scripts you want to execute:"
@@ -1004,6 +1044,8 @@ echo "2. Rollback"
 echo "3. Install Applications"
 echo "4. Apex Multiuser_BA"
 echo "5. Apex Multiuser Go"
+echo "6. ROR execution command"
+echo "7. Bulk files creation"
 
 # Prompt the user for their choice
 read -p "Enter the number of the script to execute (1-6): " choice
@@ -1028,6 +1070,16 @@ case $choice in
     
         Rollback
         ;;
+        
+    6)
+    
+        ROR
+        ;;
+        
+    7)
+       Bulk_files_creation
+       ;;
+        
     *)
         echo "Invalid selection."
         exit 1
