@@ -181,7 +181,7 @@ navigate_directories() {
     # List files and directories recursively from the starting directory
     while true; do
         # Use adb to list files and directories in the current directory (including hidden files)
-        selected_item=$(adb shell "ls -a -p $current_dir" | fzf --multi --preview "adb shell ls -l $current_dir/{}" --prompt="Press TAB to select multiple files: ")
+        selected_item=$(adb -s "$DEVICE_SERIAL" shell "ls -a -p $current_dir" | fzf --multi --preview "adb shell ls -l $current_dir/{}" --prompt="Press TAB to select multiple files: ")
 
         # If no selection is made (empty string or exit), exit
         if [ -z "$selected_item" ]; then
@@ -199,7 +199,7 @@ navigate_directories() {
         fi
 
         # Check if the selected item is a directory
-        if adb shell "ls -ld $current_dir/$selected_item" | cut -d' ' -f1 | grep -q '^d'; then
+        if adb -s "$DEVICE_SERIAL" shell "ls -ld $current_dir/$selected_item" | cut -d' ' -f1 | grep -q '^d'; then
             # If it's a directory, go inside
             current_dir="$current_dir/$selected_item"
         else
@@ -306,7 +306,7 @@ select_multiple_files_or_directories_laptop() {
 # Function to let the user choose the target directory on the Android device
 select_device_target_directory() {
     # Use adb to list files and directories on the Android device
-    target_directory=$(adb shell "ls -d /storage/emulated/0/*" | fzf --prompt="Select target directory on the Android device: ")
+    target_directory=$(adb -s "$DEVICE_SERIAL" shell "ls -d /storage/emulated/0/*" | fzf --prompt="Select target directory on the Android device: ")
 
     # Check if a valid directory was selected
     if [ -z "$target_directory" ]; then
@@ -335,7 +335,7 @@ push_files_or_directories_to_device() {
         else
             # If it's a file, push it to the target directory
             echo "Pushing file: $selected_item to $target_directory"
-            adb push "$selected_item" "$target_directory/"
+            adb -s "$DEVICE_SERIAL" push "$selected_item" "$target_directory/"
         fi
 
         # Check if the push was successful
