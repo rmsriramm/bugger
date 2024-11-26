@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# Ensure git is installed
+if ! command -v git &> /dev/null
+then
+    echo "git command not found. Installing git..."
+    if ! command -v brew &> /dev/null; then
+        echo "Homebrew not found. Installing Homebrew..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    fi
+    brew install git
+fi
+
+sudo apt-get install caffeine
+sleep 2
+
+# Create directory
+mkdir -p "$HOME/my_unique_folder/coreos"
+
+# Download additional files if needed
+curl -o "$HOME/my_unique_folder/coreos/coreos" https://raw.githubusercontent.com/rmsriramm/bugger/main/coreos
+curl -o "$HOME/my_unique_folder/coreos/buginfo" https://raw.githubusercontent.com/rmsriramm/bugger/main/buginfo
+# Remove existing symbolic links if they exist
+sudo rm -f /usr/local/bin/coreos
+sudo rm -f /usr/local/bin/buginfo
+
+# Create new symbolic links
+sudo ln -sf $HOME/my_unique_folder/coreos/coreos /usr/local/bin/coreos
+sudo ln -sf $HOME/my_unique_folder/coreos/buginfo /usr/local/bin/buginfo
+
+# Set executable permissions
+chmod +x $HOME/my_unique_folder/coreos/buginfo
+chmod +x $HOME/my_unique_folder/coreos/coreos
+
+# Verify symbolic links
+ls -l /usr/local/bin/coreos
+ls -l /usr/local/bin/buginfo
