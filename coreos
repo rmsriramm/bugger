@@ -1048,7 +1048,7 @@ echo "6. ROR execution command"
 echo "7. Bulk files creation"
 
 # Prompt the user for their choice
-read -p "Enter the number of the script to execute (1-6): " choice
+read -p "Enter the number of the script to execute (1-7): " choice
 
 # Execute the corresponding function based on user input
 case $choice in
