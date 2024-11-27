@@ -588,6 +588,7 @@ fi
 echo "Available Applications:"
 echo "1) Install all APKs"
 echo "2) Select specific applications to install"
+echo "3) Exit"
 echo "Enter your choice (1 or 2):"
 
 read -rp "Choice: " choice
@@ -624,6 +625,10 @@ case $choice in
                 echo -e "${RED}Invalid selection: $index. Skipping...${NC}"
             fi
         done
+        ;;
+      3)
+        echo "Exiting."
+        exit 0
         ;;
     *)
         echo -e "${RED}Invalid choice.${NC}"
