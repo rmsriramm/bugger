@@ -799,7 +799,17 @@ sleep 5
 
 echo "Running logcat to verfiy the ROR logs"
 
-(caffeine &) && adb -s "$DEVICE_SERIAL" logcat | grep -e "SSM:" -e "SysU:" -e "RH:" -e "UChk::Mainline:"
+ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        # Linux (Debian/Ubuntu)
+       sudo systemd-inhibit --what=handle-lid-switch --mode=block adb -s "$DEVICE_SERIAL" logcat | grep -e "SSM:" -e "SysU:" -e "RH:" -e "UChk::Mainline:"
+       
+   elif [[ "$OSTYPE" == "darwin"* ]]; then
+        sudo pmset noidle & adb -s "$DEVICE_SERIAL" logcat | grep -e "SSM:" -e "SysU:" -e "RH:" -e "UChk::Mainline:"
+        
+    else
+        echo "unable to find which laptop to execute."
+        exit 1
+    fi
 
 }
 After_ROR(){
@@ -1046,9 +1056,10 @@ echo "4. Apex Multiuser_BA"
 echo "5. Apex Multiuser Go"
 echo "6. ROR execution command"
 echo "7. Bulk files creation"
+echo "8. Exit"
 
 # Prompt the user for their choice
-read -p "Enter the number of the script to execute (1-7): " choice
+read -p "Enter the number of the script to execute (1-8): " choice
 
 # Execute the corresponding function based on user input
 case $choice in
@@ -1079,7 +1090,11 @@ case $choice in
     7)
        Bulk_files_creation
        ;;
-        
+       
+    8)
+        echo "Exiting."
+        exit 0
+        ;;
     *)
         echo "Invalid selection."
         exit 1
@@ -1087,4 +1102,3 @@ case $choice in
 esac
 
 echo "Script executed successfully."
-
