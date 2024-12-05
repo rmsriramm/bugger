@@ -494,6 +494,7 @@ done
 
 sideload() {
 
+
 # Call the Device_selections function
 Device_selections
 
@@ -503,6 +504,14 @@ CURRENT_DIR=$(pwd)
 # Set both SCRIPT_DIR and ZIP_DIR to the current working directory
 SCRIPT_DIR="$CURRENT_DIR"
 ZIP_DIR="$CURRENT_DIR"
+
+# Check if any ZIP files exist
+ZIP_FILES=$(find "$ZIP_DIR" -name "*.zip")
+
+if [ -z "$ZIP_FILES" ]; then
+    echo "No Train ZIP files found in the current directory. Please add the necessary files."
+    exit 1
+fi
 
 # Find the latest version of bundletool-all.jar relative to SCRIPT_DIR
 BUNDLETOOL_JAR=$(find "$SCRIPT_DIR" -name "bundletool-all-*.jar" | sort -V | tail -n 1)
@@ -541,16 +550,6 @@ fi
 # Use the selected device
 echo "Using device: $DEVICE_NAME ($DEVICE_SERIAL)"
 
-# Check if any ZIP files exist
-ZIP_FILES=$(find "$ZIP_DIR" -name "*.zip")
-
-if [ -z "$ZIP_FILES" ]; then
-    echo "No ZIP files found in the current directory. Please add the necessary files."
-    exit 1
-fi
-
-
-echo "Using device: $DEVICE_NAME ($DEVICE_SERIAL)"
 
 # Process each zip file in ZIP_DIR
 for zip_file in "$ZIP_DIR"/*.zip; do
