@@ -493,14 +493,8 @@ done
 
 
 sideload() {
-Device_selections
 
-#!/bin/bash
-
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
+# Call the Device_selections function
 Device_selections
 
 # Determine the current working directory
@@ -513,8 +507,45 @@ ZIP_DIR="$CURRENT_DIR"
 # Find the latest version of bundletool-all.jar relative to SCRIPT_DIR
 BUNDLETOOL_JAR=$(find "$SCRIPT_DIR" -name "bundletool-all-*.jar" | sort -V | tail -n 1)
 
+# If bundletool is not found, download it
 if [ -z "$BUNDLETOOL_JAR" ]; then
-    echo "Error: bundletool-all.jar not found in $SCRIPT_DIR"
+    #!/bin/bash
+
+# Fetch the latest release page URL and extract the version tag using jq
+LATEST_VERSION=$(curl -s https://api.github.com/repos/google/bundletool/releases/latest | jq -r .tag_name)
+
+# Check if version extraction was successful
+if [ -z "$LATEST_VERSION" ]; then
+    echo "Failed to retrieve the latest version. Please check the GitHub API."
+    exit 1
+fi
+
+# Set the download URL for the bundletool jar file
+DOWNLOAD_URL="https://github.com/google/bundletool/releases/download/${LATEST_VERSION}/bundletool-all-${LATEST_VERSION}.jar"
+
+# Download the bundletool jar file
+echo "Downloading bundletool version ${LATEST_VERSION}..."
+curl -L -o "bundletool-all-${LATEST_VERSION}.jar" "$DOWNLOAD_URL"
+
+# Confirm the download
+if [ -f "bundletool-all-${LATEST_VERSION}.jar" ]; then
+    echo "Download completed successfully: bundletool-all-${LATEST_VERSION}.jar"
+else
+    echo "Download failed. Please check the URL and the file format."
+fi
+
+
+    BUNDLETOOL_JAR="$SCRIPT_DIR/bundletool-all-${LATEST_VERSION}.jar"
+fi
+
+# Use the selected device
+echo "Using device: $DEVICE_NAME ($DEVICE_SERIAL)"
+
+# Check if any ZIP files exist
+ZIP_FILES=$(find "$ZIP_DIR" -name "*.zip")
+
+if [ -z "$ZIP_FILES" ]; then
+    echo "No ZIP files found in the current directory. Please add the necessary files."
     exit 1
 fi
 
@@ -541,26 +572,6 @@ if [ "$restart_choice" == "y" ]; then
 else
     echo -e "${RED}Thank you.${NC}"
 fi
-}
-
-Install_apks(){
-Device_selections
-# Directory where APK files are stored
-APK_DIR=$(pwd)
-
-# Function to install APK
-install_apk() {
-    local apk_path="$1"
-    local apk_name="$(basename "$apk_path")"
-    
-    echo "Installing $apk_name..."
-    
-    # Install APK
-    if adb -s "$DEVICE_SERIAL" install "$apk_path"; then
-        echo -e "${GREEN}Successfully installed $apk_name.${NC}" > /dev/null 2>&1
-    else
-        echo -e "${RED}Failed to install $apk_name.${NC}"
-    fi
 }
 
 # Function to install all APKs in the directory
