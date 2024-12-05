@@ -9,8 +9,31 @@ then
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
     brew install git
+else
+    echo "git is already installed."
 fi
 
+# Ensure jq is installed
+if ! command -v jq &> /dev/null
+then
+    echo "jq command not found. Installing jq..."
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        # For Linux systems
+        sudo apt-get update
+        sudo apt-get install -y jq
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        # For macOS systems
+        brew install jq
+    else
+        echo "Unsupported OS type. Please install jq manually."
+        exit 1
+    fi
+    echo "jq has been installed."
+else
+    echo "jq is already installed."
+fi
+
+# Install caffeine (on Linux)
 sudo apt-get install caffeine
 sleep 2
 
@@ -35,3 +58,4 @@ chmod +x $HOME/my_unique_folder/coreos/coreos
 # Verify symbolic links
 ls -l /usr/local/bin/coreos
 ls -l /usr/local/bin/buginfo
+
