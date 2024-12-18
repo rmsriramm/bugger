@@ -36,6 +36,8 @@ fi
 # Install caffeine (on Linux)
 sudo apt-get install caffeine
 sleep 2
+sudo apt install fzf
+
 
 # Create directory
 mkdir -p "$HOME/my_unique_folder/coreos"
