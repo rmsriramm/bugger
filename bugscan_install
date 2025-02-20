@@ -1,0 +1,31 @@
+#!/bin/bash
+
+
+# Ensure git is installed
+if ! command -v git &> /dev/null
+then
+    echo "git command not found. Installing git..."
+    sudo apt update
+    sudo apt install -y git
+fi
+
+# Create directory
+mkdir -p "$HOME/my_unique_folder1/coreos"
+
+# Download additional files if needed
+curl -o "$HOME/my_unique_folder1/coreos/bugscan" -L https://raw.githubusercontent.com/rmsriramm/bugger/refs/heads/main/bugscan
+
+
+# Remove existing symbolic links if they exist
+
+sudo rm -f /usr/local/bin/bugscan
+
+# Create new symbolic links
+sudo ln -sf $HOME/my_unique_folder1/coreos/bugscan /usr/local/bin/bugscan
+
+# Set executable permissions
+chmod +x $HOME/my_unique_folder1/coreos/bugscan
+
+
+# Verify symbolic links
+ls -l /usr/local/bin/bugscan
